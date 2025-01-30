@@ -35,6 +35,7 @@ import sys
 import workflow.scripts.common as common
 common.fastq_dict = fastq_dict
 common.runs_dict = runs_dict
+common.config = config
 
 # Rules
 include: "workflow/rules/mapping.smk"
@@ -44,7 +45,7 @@ include: "workflow/rules/somatic_snv.smk"
 rule all:
     input:
         [
-            f"bam/{run}/{sample}.bam"
+            f"bam/{run}/{sample}.rg.bam"
             for run in runs_dict
             for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
         ],
