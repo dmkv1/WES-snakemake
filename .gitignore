@@ -1,0 +1,18 @@
+# Snakemake
+.snakemake/
+results/
+logs/
+bam/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data
+*.bam
+*.vcf
+*.vcf.gz
+*.xlsx
+*.xls
+*.csv

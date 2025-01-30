@@ -1,0 +1,6 @@
+paths:
+  refs:
+    genome_human: "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.fasta"
+
+resources:
+  bwa_threads: 16
