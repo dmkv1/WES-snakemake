@@ -10,6 +10,8 @@ __pycache__/
 *$py.class
 
 # Data
+*.fastq
+*.fastq.gz
 *.bam
 *.vcf
 *.vcf.gz
