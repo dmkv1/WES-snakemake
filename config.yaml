@@ -1,6 +1,13 @@
 paths:
   refs:
+    # Path to the reference folder for container mounting
+    path: "/media/data/NGS/refs"
+    # Absolute paths to reference files
     genome_human: "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.fasta"
+    known_sites:
+      - "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.dbsnp138.vcf"
+      - "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.known_indels.vcf.gz"
+      - "/media/data/NGS/refs/broad/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
 
 resources:
   bwa_threads: 16

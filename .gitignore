@@ -2,7 +2,6 @@
 .snakemake/
 results/
 logs/
-bam/
 
 # Python
 __pycache__/
@@ -10,6 +9,10 @@ __pycache__/
 *$py.class
 
 # Data
+bam/
+metrics/
+vcf/
+tmp/
 *.fastq
 *.fastq.gz
 *.bam

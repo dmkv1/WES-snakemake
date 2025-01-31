@@ -28,14 +28,21 @@ for _, row in samples.iterrows():
             "fq2": row["fq2"],
         }
 
+wildcard_constraints:
+    sample="[^.]+",  # Match anything except dots
+    run="[^.]+"      # Match anything except dots
+
 # Import helper functions
 from workflow.scripts.common import *
+
 # Make dictionaries available to the common module
 import sys
 import workflow.scripts.common as common
+
 common.fastq_dict = fastq_dict
 common.runs_dict = runs_dict
 common.config = config
+
 
 # Rules
 include: "workflow/rules/mapping.smk"
@@ -45,7 +52,7 @@ include: "workflow/rules/somatic_snv.smk"
 rule all:
     input:
         [
-            f"bam/{run}/{sample}.rg.bam"
+            f"bam/{run}/{sample}.bam"
             for run in runs_dict
             for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
         ],
