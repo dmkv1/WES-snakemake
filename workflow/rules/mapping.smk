@@ -97,7 +97,14 @@ rule mark_duplicates:
 
 rule create_base_recalibration:
     input:
-        bam="bam/{run}/{sample}.md.bam",
+        bam=lambda wildcards: (
+            "bam/{run}/{sample}.xenofiltered.bam".format(
+                run=wildcards.run, sample=wildcards.sample
+            ) if wildcards.run in pdx_dict and wildcards.sample in pdx_dict[wildcards.run]
+            else "bam/{run}/{sample}.md.bam".format(
+                run=wildcards.run, sample=wildcards.sample
+            )
+        ),
         refg=config["paths"]["refs"]["genome_human"],
     output:
         "metrics/{run}/{sample}.recal_data.table",
@@ -131,7 +138,14 @@ rule create_base_recalibration:
 rule apply_base_recalibration:
     input:
         refg=config["paths"]["refs"]["genome_human"],
-        bam="bam/{run}/{sample}.md.bam",
+        bam=lambda wildcards: (
+            "bam/{run}/{sample}.xenofiltered.bam".format(
+                run=wildcards.run, sample=wildcards.sample
+            ) if wildcards.run in pdx_dict and wildcards.sample in pdx_dict[wildcards.run]
+            else "bam/{run}/{sample}.md.bam".format(
+                run=wildcards.run, sample=wildcards.sample
+            )
+        ),
         bsqr_recal="metrics/{run}/{sample}.recal_data.table",
     output:
         "bam/{run}/{sample}.bam",

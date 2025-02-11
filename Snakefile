@@ -17,6 +17,16 @@ for run in samples["run"].unique():
         "tumors": run_samples[run_samples["Type"] != "CTRL"]["samplename"].tolist(),
     }
 
+# Create a dictionary of PDX samples
+pdx_dict = {}
+for run in samples["run"].unique():
+    if pd.isna(run):
+        continue
+    run_samples = samples[samples["run"] == run]
+    pdx_samples = run_samples[run_samples["Type"] == "PDX"]["samplename"].tolist()
+    if pdx_samples:  # Only add the run if it has PDX samples
+        pdx_dict[run] = pdx_samples
+
 # Create a dictionary to store fastq paths
 fastq_dict = {}
 for _, row in samples.iterrows():
@@ -28,9 +38,11 @@ for _, row in samples.iterrows():
             "fq2": row["fq2"],
         }
 
+
 wildcard_constraints:
     sample="[^.]+",  # Match anything except dots
-    run="[^.]+"      # Match anything except dots
+    run="[^.]+",  # Match anything except dots
+
 
 # Import helper functions
 from workflow.scripts.common import *
@@ -41,11 +53,13 @@ import workflow.scripts.common as common
 
 common.fastq_dict = fastq_dict
 common.runs_dict = runs_dict
+common.pdx_dict = pdx_dict
 common.config = config
 
 
 # Rules
 include: "workflow/rules/mapping.smk"
+include: "workflow/rules/xenofilter.smk"
 include: "workflow/rules/somatic_snv.smk"
 
 
