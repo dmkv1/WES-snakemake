@@ -91,6 +91,7 @@ rule mark_duplicates:
         -I {input} \
         -O {output.bam} \
         -M {output.metrics} \
+        --CREATE_INDEX false \
         --TMP_DIR tmp
         """
 

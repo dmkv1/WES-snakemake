@@ -4,7 +4,7 @@ paths:
     path: "/media/data/NGS/refs"
     # Absolute paths to reference files
     genome_human: "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.fasta"
-    genome_mouse: "/media/data/NGS/refs/mm39/mm39.fa"
+    genome_host: "/media/data/NGS/refs/mm39/mm39.fa"
     known_sites:
       - "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.dbsnp138.vcf"
       - "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.known_indels.vcf.gz"
