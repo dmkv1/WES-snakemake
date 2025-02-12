@@ -55,8 +55,8 @@ rule filter_mutect2_calls:
         refg=config["paths"]["refs"]["genome_human"],
         stats="vcf/{run}/{run}.mutect2.unfiltered.vcf.stats",
     output:
-        vcf="vcf/{run}/{run}.mutect2.filtered.vcf",
-        idx="vcf/{run}/{run}.mutect2.filtered.vcf.idx",
+        vcf=temp("vcf/{run}/{run}.mutect2.filtered.vcf"),
+        idx=temp("vcf/{run}/{run}.mutect2.filtered.vcf.idx"),
         filtering_stats="metrics/{run}/{run}.mutect2.filteringStats.tsv",
     params:
         gatk_ver=config["tools"]["gatk_version"],
@@ -87,7 +87,7 @@ rule funcotator:
         data_sources=config["paths"]["refs"]["funcotator_data_sources"],
     output:
         vcf="vcf/{run}/{run}.mutect2.vcf",
-        idx="vcf/{run}/{run}.mutect2.vcf.idx"
+        idx="vcf/{run}/{run}.mutect2.vcf.idx",
     params:
         gatk_ver=config["tools"]["gatk_version"],
         ref_path=config["paths"]["refs"]["path"],
