@@ -5,7 +5,7 @@ rule bwa_map_host:
         fq2=get_fastq2,
     output:
         temp("bam/{run}/{sample}.host.unsorted.bam"),
-    threads: config["resources"]["bwa_threads"]
+    threads: config["resources"]["threads"]
     shell:
         "bwa mem -M -t {threads} {input.refg} {input.fq1} {input.fq2} | samtools view -Sb - > {output}"
 
@@ -14,7 +14,7 @@ rule sort_host_bam:
         "bam/{run}/{sample}.host.unsorted.bam"
     output:
         temp("bam/{run}/{sample}.host.bam")
-    threads: config["resources"]["bwa_threads"]
+    threads: config["resources"]["threads"]
     shell:
         "samtools sort -@ {threads} -o {output} {input}"
 

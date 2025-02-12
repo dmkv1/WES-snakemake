@@ -70,3 +70,4 @@ rule all:
             for run in runs_dict
             for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
         ],
+        [f"vcf/{run}/{run}.mutect2.vcf" for run in runs_dict],

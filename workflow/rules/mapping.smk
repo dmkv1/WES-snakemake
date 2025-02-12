@@ -5,7 +5,7 @@ rule bwa_map:
         fq2=get_fastq2,
     output:
         temp("bam/{run}/{sample}.raw.bam"),
-    threads: config["resources"]["bwa_threads"]
+    threads: config["resources"]["threads"]
     shell:
         "bwa mem -M -t {threads} {input.refg} {input.fq1} {input.fq2} | samtools view -Sb - > {output}"
 
@@ -101,7 +101,9 @@ rule create_base_recalibration:
         bam=lambda wildcards: (
             "bam/{run}/{sample}.xenofiltered.bam".format(
                 run=wildcards.run, sample=wildcards.sample
-            ) if wildcards.run in pdx_dict and wildcards.sample in pdx_dict[wildcards.run]
+            )
+            if wildcards.run in pdx_dict
+            and wildcards.sample in pdx_dict[wildcards.run]
             else "bam/{run}/{sample}.md.bam".format(
                 run=wildcards.run, sample=wildcards.sample
             )
@@ -142,7 +144,9 @@ rule apply_base_recalibration:
         bam=lambda wildcards: (
             "bam/{run}/{sample}.xenofiltered.bam".format(
                 run=wildcards.run, sample=wildcards.sample
-            ) if wildcards.run in pdx_dict and wildcards.sample in pdx_dict[wildcards.run]
+            )
+            if wildcards.run in pdx_dict
+            and wildcards.sample in pdx_dict[wildcards.run]
             else "bam/{run}/{sample}.md.bam".format(
                 run=wildcards.run, sample=wildcards.sample
             )
