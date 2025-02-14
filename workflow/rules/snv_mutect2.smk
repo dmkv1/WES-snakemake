@@ -80,6 +80,7 @@ rule filter_mutect2_calls:
         --filtering-stats {output.filtering_stats}
         """
 
+
 rule funcotator:
     input:
         vcf="vcf/{run}/{run}.mutect2.filtered.vcf",
@@ -91,7 +92,7 @@ rule funcotator:
     params:
         gatk_ver=config["tools"]["gatk_version"],
         ref_path=config["paths"]["refs"]["path"],
-        genome_ver=config["params"]["genome_version"]
+        genome_ver=config["params"]["genome_version"],
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
@@ -111,4 +112,3 @@ rule funcotator:
         --variant {input.vcf} \
         --output {output.vcf}
         """
-    

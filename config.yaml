@@ -13,7 +13,7 @@ paths:
     funcotator_data_sources: "/media/data/NGS/refs/funcotator/funcotator_dataSources.v1.8.hg38.20230908s"
 
 resources:
-  threads: 16
+  threads: 32
   java_max_gb: 480
   java_min_gb: 80
 

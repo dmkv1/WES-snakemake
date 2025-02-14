@@ -60,7 +60,8 @@ common.config = config
 # Rules
 include: "workflow/rules/mapping.smk"
 include: "workflow/rules/xenofilter.smk"
-include: "workflow/rules/somatic_snv.smk"
+include: "workflow/rules/snv_mutect2.smk"
+include: "workflow/rules/snv_varscan2.smk"
 
 
 rule all:
@@ -71,3 +72,4 @@ rule all:
             for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
         ],
         [f"vcf/{run}/{run}.mutect2.vcf" for run in runs_dict],
+        [f"vcf/{run}/{run}.varscan.vcf" for run in runs_dict],

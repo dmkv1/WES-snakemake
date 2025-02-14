@@ -1,0 +1,10 @@
+name: varscan
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - varscan=2.4.6
+  - samtools=1.18
+  - bcftools=1.18
+  

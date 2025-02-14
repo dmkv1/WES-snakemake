@@ -12,6 +12,7 @@ __pycache__/
 bam/
 metrics/
 vcf/
+mpileup/
 tmp/
 *.fastq
 *.fastq.gz
