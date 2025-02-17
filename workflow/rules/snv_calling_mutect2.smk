@@ -16,6 +16,7 @@ rule run_mutect2:
             "bam/{run}/{sample}.bam", run=w.run, sample=runs_dict[w.run]["tumors"]
         ),
         refg=config["paths"]["refs"]["genome_human"],
+        regions=config["paths"]["refs"]["regions_bedfile"]
     output:
         vcf=temp("vcf/{run}/{run}.mutect2.unfiltered.vcf"),
         idx=temp("vcf/{run}/{run}.mutect2.unfiltered.vcf.idx"),
@@ -42,6 +43,7 @@ rule run_mutect2:
         --native-pair-hmm-threads {threads} \
         -R {input.refg} \
         --germline-resource {params.germline} \
+        --intervals {input.regions} \
         -I {input.normal} \
         -normal {params.normal_name} \
         {params.tumor_inputs} \

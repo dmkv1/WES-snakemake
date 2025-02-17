@@ -3,14 +3,20 @@ paths:
     # Path to the reference folder for container mounting
     path: "/media/data/NGS/refs"
     # Absolute paths to reference files
+    ## Genomes
     genome_human: "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.fasta"
     genome_host: "/media/data/NGS/refs/mm39/mm39.fa"
+    ## BQSR
     known_sites:
       - "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.dbsnp138.vcf"
       - "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.known_indels.vcf.gz"
       - "/media/data/NGS/refs/broad/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
+    ## Mutect2 
     germline_resource: "/media/data/NGS/refs/gatk-BP-somatic-hg38/af-only-gnomad.hg38.vcf.gz"
+    ## Funcotator
     funcotator_data_sources: "/media/data/NGS/refs/funcotator/funcotator_dataSources.v1.8.hg38.20230908s"
+    ## Exome regions
+    regions_bedfile: "/media/data/NGS/refs/SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
 
 resources:
   threads: 32
