@@ -22,6 +22,7 @@ rule run_mutect2:
         idx=temp("vcf/{run}/{run}.mutect2.unfiltered.vcf.idx"),
         stats="vcf/{run}/{run}.mutect2.unfiltered.vcf.stats",
     params:
+        gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
         normal_name=get_normal_sample,
         tumor_inputs=get_tumor_inputs,
@@ -37,7 +38,7 @@ rule run_mutect2:
         -v {params.ref_path}:{params.ref_path} \
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
-        broadinstitute/gatk:{params.gatk_ver} gatk \
+        {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         Mutect2 \
         --native-pair-hmm-threads {threads} \
@@ -61,6 +62,7 @@ rule filter_mutect2_calls:
         idx=temp("vcf/{run}/{run}.mutect2.filtered.vcf.idx"),
         filtering_stats="metrics/{run}/{run}.mutect2.filteringStats.tsv",
     params:
+        gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
         ref_path=config["paths"]["refs"]["path"],
     resources:
@@ -72,7 +74,7 @@ rule filter_mutect2_calls:
         -v {params.ref_path}:{params.ref_path} \
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
-        broadinstitute/gatk:{params.gatk_ver} gatk \
+        {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         FilterMutectCalls \
         -R {input.refg} \
@@ -92,6 +94,7 @@ rule funcotator:
         vcf="vcf/{run}/{run}.mutect2.vcf",
         idx="vcf/{run}/{run}.mutect2.vcf.idx",
     params:
+        gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
         ref_path=config["paths"]["refs"]["path"],
         genome_ver=config["params"]["genome_version"],
@@ -104,7 +107,7 @@ rule funcotator:
         -v {params.ref_path}:{params.ref_path} \
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
-        broadinstitute/gatk:{params.gatk_ver} gatk \
+        {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         Funcotator \
         --reference {input.refg} \

@@ -25,7 +25,10 @@ resources:
   strelka_max_gb: 480
 
 tools:
-  gatk_version: "4.6.1.0"  # Or your preferred version
+  gatk_image: "broadinstitute/gatk"
+  gatk_version: "4.6.1.0"
+  strelka_image: "mcfonsecalab/strelka"
+  strelka_version: "2.9.10"
 
 params:
     library_prep: "SureSelectV8UTR"

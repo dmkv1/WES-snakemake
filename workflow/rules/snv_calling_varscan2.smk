@@ -71,16 +71,16 @@ rule compress_vcf:
         "../envs/varscan.yaml"
     shell:
         """
-       bgzip -c {input} > {output.vcf} &&
-       tabix -p vcf {output.vcf}
-       """
+        bgzip -c {input} > {output.vcf} &&
+        tabix -p vcf {output.vcf}
+        """
 
 
 rule concat_varscan_vcfs:
     input:
-        vcf_snp="vcf/{run}/{sample}.varscan.snp.vcf.gz",
+        vcf_snv="vcf/{run}/{sample}.varscan.snp.vcf.gz",
+        tbi_snv="vcf/{run}/{sample}.varscan.snp.vcf.gz.tbi",
         vcf_indel="vcf/{run}/{sample}.varscan.indel.vcf.gz",
-        tbi_snp="vcf/{run}/{sample}.varscan.snp.vcf.gz.tbi",
         tbi_indel="vcf/{run}/{sample}.varscan.indel.vcf.gz.tbi",
     output:
         vcf="vcf/{run}/{sample}.varscan.vcf.gz",
@@ -88,13 +88,13 @@ rule concat_varscan_vcfs:
         "../envs/varscan.yaml"
     shell:
         """
-       bcftools concat -a --allow-overlaps {input.vcf_snp} {input.vcf_indel} | \
-       bcftools sort -Oz -o {output.vcf} &&
-       bcftools index -t {output.vcf}
-       """
+        bcftools concat -a --allow-overlaps {input.vcf_snv} {input.vcf_indel} | \
+        bcftools sort -Oz -o {output.vcf} &&
+        bcftools index -t {output.vcf}
+        """
 
 
-rule merge_vcfs:
+rule merge_varscan_vcfs:
     input:
         vcfs=lambda w: [
             f"vcf/{w.run}/{sample}.varscan.vcf.gz"

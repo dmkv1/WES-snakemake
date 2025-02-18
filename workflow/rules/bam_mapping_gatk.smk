@@ -16,6 +16,7 @@ rule add_read_groups:
     output:
         temp("bam/{run}/{sample}.rg.bam"),
     params:
+        gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
         tmp_dir="tmp",
         rg=get_read_group_params,
@@ -27,7 +28,7 @@ rule add_read_groups:
         docker run --rm \
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
-        broadinstitute/gatk:{params.gatk_ver} gatk \
+        {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         AddOrReplaceReadGroups \
         -I {input} \
@@ -47,6 +48,7 @@ rule fix_mate_info:
     output:
         temp("bam/{run}/{sample}.fixmate.bam"),
     params:
+        gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
         tmp_dir="tmp",
     resources:
@@ -57,7 +59,7 @@ rule fix_mate_info:
         docker run --rm \
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
-        broadinstitute/gatk:{params.gatk_ver} gatk \
+        {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         FixMateInformation \
         -I {input} \
@@ -75,6 +77,7 @@ rule mark_duplicates:
         bam=temp("bam/{run}/{sample}.md.bam"),
         metrics="metrics/{run}/{sample}.dupl_metrics.txt",
     params:
+        gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
         tmp_dir="tmp",
     resources:
@@ -85,7 +88,7 @@ rule mark_duplicates:
         docker run --rm \
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
-        broadinstitute/gatk:{params.gatk_ver} gatk \
+        {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         MarkDuplicates \
         -I {input} \
@@ -112,6 +115,7 @@ rule create_base_recalibration:
     output:
         "metrics/{run}/{sample}.recal_data.table",
     params:
+        gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
         tmp_dir="tmp",
         ref_path=config["paths"]["refs"]["path"],
@@ -127,7 +131,7 @@ rule create_base_recalibration:
         -v {params.ref_path}:{params.ref_path} \
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
-        broadinstitute/gatk:{params.gatk_ver} gatk \
+        {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         BaseRecalibrator \
         -I {input.bam} \
@@ -155,6 +159,7 @@ rule apply_base_recalibration:
     output:
         "bam/{run}/{sample}.bam",
     params:
+        gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
         tmp_dir="tmp",
         ref_path=config["paths"]["refs"]["path"],
@@ -167,7 +172,7 @@ rule apply_base_recalibration:
         -v {params.ref_path}:{params.ref_path} \
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
-        broadinstitute/gatk:{params.gatk_ver} gatk \
+        {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         ApplyBQSR \
         -R {input.refg} \

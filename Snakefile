@@ -76,7 +76,7 @@ rule all:
         [f"vcf/{run}/{run}.mutect2.vcf" for run in runs_dict],
         [f"vcf/{run}/{run}.varscan.vcf" for run in runs_dict],
         [
-            f"vcf/{run}/{sample}/strelka/results/variants/somatic.snvs.vcf.gz"
+            f"vcf/{run}/{sample}.strelka.vcf"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],

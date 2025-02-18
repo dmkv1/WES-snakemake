@@ -1,6 +1,3 @@
-import os
-
-
 rule index_bed:
     input:
         bed=config["paths"]["refs"]["regions_bedfile"],
