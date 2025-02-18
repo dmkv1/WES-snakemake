@@ -58,10 +58,12 @@ common.config = config
 
 
 # Rules
+include: "workflow/rules/ref_index.smk"
 include: "workflow/rules/bam_mapping_gatk.smk"
 include: "workflow/rules/xenofilter.smk"
 include: "workflow/rules/snv_calling_mutect2.smk"
 include: "workflow/rules/snv_calling_varscan2.smk"
+include: "workflow/rules/snv_calling_strelka2.smk"
 
 
 rule all:
@@ -73,3 +75,8 @@ rule all:
         ],
         [f"vcf/{run}/{run}.mutect2.vcf" for run in runs_dict],
         [f"vcf/{run}/{run}.varscan.vcf" for run in runs_dict],
+        [
+            f"vcf/{run}/{sample}/strelka/results/variants/somatic.snvs.vcf.gz"
+            for run in runs_dict
+            for sample in runs_dict[run]["tumors"]
+        ],

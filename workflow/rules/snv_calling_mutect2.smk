@@ -16,7 +16,7 @@ rule run_mutect2:
             "bam/{run}/{sample}.bam", run=w.run, sample=runs_dict[w.run]["tumors"]
         ),
         refg=config["paths"]["refs"]["genome_human"],
-        regions=config["paths"]["refs"]["regions_bedfile"]
+        regions="refs/regions/regions.bed",
     output:
         vcf=temp("vcf/{run}/{run}.mutect2.unfiltered.vcf"),
         idx=temp("vcf/{run}/{run}.mutect2.unfiltered.vcf.idx"),

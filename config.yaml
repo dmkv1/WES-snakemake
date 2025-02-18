@@ -22,6 +22,7 @@ resources:
   threads: 32
   java_max_gb: 480
   java_min_gb: 80
+  strelka_max_gb: 480
 
 tools:
   gatk_version: "4.6.1.0"  # Or your preferred version
