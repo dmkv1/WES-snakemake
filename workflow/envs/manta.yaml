@@ -1,10 +1,9 @@
-name: strelka
+name: manta
 channels:
   - bioconda
   - conda-forge
   - defaults
 dependencies:
-  - strelka=2.9.10
   - manta=1.6.0
   - samtools=1.18
   - bcftools=1.18

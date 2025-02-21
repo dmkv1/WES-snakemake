@@ -64,6 +64,7 @@ include: "workflow/rules/xenofilter.smk"
 include: "workflow/rules/snv_calling_mutect2.smk"
 include: "workflow/rules/snv_calling_varscan2.smk"
 include: "workflow/rules/snv_calling_strelka2.smk"
+include: "workflow/rules/snv_somaticseq.smk"
 
 
 rule all:
@@ -73,10 +74,18 @@ rule all:
             for run in runs_dict
             for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
         ],
-        [f"vcf/{run}/{run}.mutect2.vcf" for run in runs_dict],
-        [f"vcf/{run}/{run}.varscan.vcf" for run in runs_dict],
         [
-            f"vcf/{run}/{sample}.strelka.vcf"
+            f"vcf/{run}/{sample}/{sample}.mutect2.vcf"
+            for run in runs_dict
+            for sample in runs_dict[run]["tumors"]
+        ],
+        [
+            f"vcf/{run}/{sample}/{sample}.varscan.vcf"
+            for run in runs_dict
+            for sample in runs_dict[run]["tumors"]
+        ],
+        [
+            f"vcf/{run}/{sample}/{sample}.strelka.vcf"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],

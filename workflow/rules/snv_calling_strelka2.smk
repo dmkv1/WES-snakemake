@@ -10,7 +10,7 @@ rule configure_manta:
     params:
         res_dir="vcf/{run}/{sample}/manta",
     conda:
-        "../envs/strelka.yaml"
+        "../envs/manta.yaml"
     shell:
         """
         configManta.py --exome \
@@ -38,7 +38,7 @@ rule run_manta:
         threads=config["resources"]["threads"],
         mem_gb=config["resources"]["strelka_max_gb"],
     conda:
-        "../envs/strelka.yaml"
+        "../envs/manta.yaml"
     shell:
         "{input.workflow} --mode local --jobs {resources.threads} --memGb {resources.mem_gb}"
 
@@ -111,9 +111,9 @@ rule concat_strelka_vcfs:
         vcf_indel="vcf/{run}/{sample}/strelka/results/variants/somatic.indels.vcf.gz",
         tbi_indel="vcf/{run}/{sample}/strelka/results/variants/somatic.indels.vcf.gz.tbi",
     output:
-        vcf="vcf/{run}/{sample}.strelka.vcf",
+        vcf="vcf/{run}/{sample}/{sample}.strelka.vcf",
     conda:
-        "../envs/varscan.yaml"
+        "../envs/manta.yaml"
     shell:
         """
         bcftools concat -a --allow-overlaps {input.vcf_snv} {input.vcf_indel} | \

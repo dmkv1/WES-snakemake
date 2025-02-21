@@ -4,7 +4,7 @@ rule samtools_mpileup:
         tumor=lambda w: f"bam/{w.run}/{w.sample}.bam",
         refg=config["paths"]["refs"]["genome_human"],
     output:
-        "mpileup/{run}/{sample}.mpileup",
+        mpileup="mpileup/{run}/{sample}.mpileup",
     conda:
         "../envs/varscan.yaml"
     threads: config["resources"]["threads"]
@@ -14,7 +14,7 @@ rule samtools_mpileup:
         -f {input.refg} \
         -q 1 \
         -B \
-        {input.normal} {input.tumor} > {output}
+        {input.normal} {input.tumor} > {output.mpileup}
         """
 
 
@@ -22,12 +22,13 @@ rule varscan_somatic:
     input:
         mpileup="mpileup/{run}/{sample}.mpileup",
     output:
-        snp=temp("vcf/{run}/{sample}.varscan.snp.vcf"),
-        indel=temp("vcf/{run}/{sample}.varscan.indel.vcf"),
+        snp=temp("vcf/{run}/{sample}/{sample}.varscan.snp.vcf"),
+        indel=temp("vcf/{run}/{sample}/{sample}.varscan.indel.vcf"),
     params:
-        min_coverage=8,
-        min_var_freq=0.1,
-        p_value=0.05,
+        min_coverage=config["params"]["varscan_min_coverage"],
+        min_vaf=config["params"]["varscan_min_VAF"],
+        p_value=config["params"]["varscan_p_value"],
+        somatic_p_value=config["params"]["varscan_somatic_p_value"],
     conda:
         "../envs/varscan.yaml"
     shell:
@@ -36,78 +37,74 @@ rule varscan_somatic:
         {input.mpileup} \
         --output-snp {output.snp} \
         --output-indel {output.indel} \
+        --mpileup 1 \
         --min-coverage {params.min_coverage} \
-        --min-var-freq {params.min_var_freq} \
+        --min-var-freq {params.min_vaf} \
         --p-value {params.p_value} \
-        --somatic-p-value {params.p_value} \
+        --somatic-p-value {params.somatic_p_value} \
         --strand-filter 1 \
-        --output-vcf 1 \
-        --mpileup 1
+        --output-vcf 1
         """
 
-
-rule rename_vcf_samples:
+rule varscan_filter:
     input:
-        "vcf/{run}/{sample}.varscan.{type}.vcf",
+        vcf_snv="vcf/{run}/{sample}/{sample}.varscan.snp.vcf",
+        vcf_indel="vcf/{run}/{sample}/{sample}.varscan.indel.vcf",
     output:
-        temp("vcf/{run}/{sample}.varscan.{type}.renamed.vcf"),
-    wildcard_constraints:
-        type="snp|indel",
+        vcf=temp("vcf/{run}/{sample}/{sample}.varscan.filtered_snp.vcf"),
     params:
-        normal=lambda w: runs_dict[w.run]["normal"],
-    script:
-        "../scripts/rename_vcf_sample_columns.py"
-
-
-rule compress_vcf:
-    input:
-        "vcf/{run}/{sample}.varscan.{type}.renamed.vcf",
-    output:
-        vcf=temp("vcf/{run}/{sample}.varscan.{type}.vcf.gz"),
-        tbi=temp("vcf/{run}/{sample}.varscan.{type}.vcf.gz.tbi"),
-    wildcard_constraints:
-        type="snp|indel",
+        min_cov=config["params"]["varscan_min_coverage"],
+        min_reads=config["params"]["varscan_filter_min_reads"],
+        min_strands=config["params"]["varscan_filter_min_strands"],
+        min_qual=config["params"]["varscan_filter_min_qual"],
+        min_vaf=config["params"]["varscan_filter_min_vaf"],
+        p_value=config["params"]["varscan_filter_p_value"],
     conda:
         "../envs/varscan.yaml"
     shell:
         """
-        bgzip -c {input} > {output.vcf} &&
+        varscan somaticFilter \
+        {input.vcf_snv} \
+        --output-file {output.vcf} \
+        --min-coverage {params.min_cov} \
+        --min-reads2 {params.min_reads} \
+        --min-strands2 {params.min_strands} \
+        --min-avg-qual {params.min_qual} \
+        --min-var-freq {params.min_vaf} \
+        --p-value {params.p_value} \
+        --indel-file {input.vcf_indel}
+        """
+
+
+rule compress_vcf:
+    input:
+        vcf="vcf/{run}/{sample}/{sample}.varscan.{type}.vcf",
+    output:
+        vcf=temp("vcf/{run}/{sample}/{sample}.varscan.{type}.vcf.gz"),
+        tbi=temp("vcf/{run}/{sample}/{sample}.varscan.{type}.vcf.gz.tbi"),
+    wildcard_constraints:
+        type="filtered_snp|indel",
+    conda:
+        "../envs/varscan.yaml"
+    shell:
+        """
+        bgzip -c {input.vcf} > {output.vcf} &&
         tabix -p vcf {output.vcf}
         """
 
 
 rule concat_varscan_vcfs:
     input:
-        vcf_snv="vcf/{run}/{sample}.varscan.snp.vcf.gz",
-        tbi_snv="vcf/{run}/{sample}.varscan.snp.vcf.gz.tbi",
-        vcf_indel="vcf/{run}/{sample}.varscan.indel.vcf.gz",
-        tbi_indel="vcf/{run}/{sample}.varscan.indel.vcf.gz.tbi",
+        vcf_snv="vcf/{run}/{sample}/{sample}.varscan.filtered_snp.vcf.gz",
+        tbi_snv="vcf/{run}/{sample}/{sample}.varscan.filtered_snp.vcf.gz.tbi",
+        vcf_indel="vcf/{run}/{sample}/{sample}.varscan.indel.vcf.gz",
+        tbi_indel="vcf/{run}/{sample}/{sample}.varscan.indel.vcf.gz.tbi",
     output:
-        vcf="vcf/{run}/{sample}.varscan.vcf.gz",
+        vcf="vcf/{run}/{sample}/{sample}.varscan.vcf",
     conda:
         "../envs/varscan.yaml"
     shell:
         """
         bcftools concat -a --allow-overlaps {input.vcf_snv} {input.vcf_indel} | \
-        bcftools sort -Oz -o {output.vcf} &&
-        bcftools index -t {output.vcf}
-        """
-
-
-rule merge_varscan_vcfs:
-    input:
-        vcfs=lambda w: [
-            f"vcf/{w.run}/{sample}.varscan.vcf.gz"
-            for sample in runs_dict[w.run]["tumors"]
-        ],
-    output:
-        vcf="vcf/{run}/{run}.varscan.vcf",
-    conda:
-        "../envs/varscan.yaml"
-    shell:
-        """
-        bcftools merge --merge none \
-            --force-samples \
-            {input.vcfs} | \
         bcftools sort -Ov -o {output.vcf}
         """

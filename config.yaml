@@ -6,6 +6,8 @@ paths:
     ## Genomes
     genome_human: "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.fasta"
     genome_host: "/media/data/NGS/refs/mm39/mm39.fa"
+    ## Exome regions
+    regions_bedfile: "/media/data/NGS/refs/SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
     ## BQSR
     known_sites:
       - "/media/data/NGS/refs/broad/Homo_sapiens_assembly38.dbsnp138.vcf"
@@ -19,7 +21,7 @@ paths:
     regions_bedfile: "/media/data/NGS/refs/SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
 
 resources:
-  threads: 32
+  threads: 48
   java_max_gb: 480
   java_min_gb: 80
   strelka_max_gb: 480
@@ -29,6 +31,8 @@ tools:
   gatk_version: "4.6.1.0"
   strelka_image: "mcfonsecalab/strelka"
   strelka_version: "2.9.10"
+  somaticseq_image: "lethalfang/somaticseq"
+  somaticseq_version: "latest"
 
 params:
     library_prep: "SureSelectV8UTR"

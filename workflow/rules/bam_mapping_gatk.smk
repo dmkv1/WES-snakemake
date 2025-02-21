@@ -75,7 +75,7 @@ rule mark_duplicates:
         "bam/{run}/{sample}.fixmate.bam",
     output:
         bam=temp("bam/{run}/{sample}.md.bam"),
-        metrics="metrics/{run}/{sample}.dupl_metrics.txt",
+        metrics="metrics/{run}/{sample}/{sample}.dupl_metrics.txt",
     params:
         gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
@@ -113,7 +113,7 @@ rule create_base_recalibration:
         ),
         refg=config["paths"]["refs"]["genome_human"],
     output:
-        "metrics/{run}/{sample}.recal_data.table",
+        recal_data="metrics/{run}/{sample}/{sample}.recal_data.table",
     params:
         gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
@@ -135,7 +135,7 @@ rule create_base_recalibration:
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         BaseRecalibrator \
         -I {input.bam} \
-        -O {output} \
+        -O {output.recal_data} \
         -R {input.refg} \
         {params.known_sites} \
         --tmp-dir {params.tmp_dir}
@@ -155,9 +155,10 @@ rule apply_base_recalibration:
                 run=wildcards.run, sample=wildcards.sample
             )
         ),
-        bsqr_recal="metrics/{run}/{sample}.recal_data.table",
+        bsqr_recal="metrics/{run}/{sample}/{sample}.recal_data.table",
     output:
-        "bam/{run}/{sample}.bam",
+        bam="bam/{run}/{sample}.bam",
+        bai="bam/{run}/{sample}.bai",
     params:
         gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
@@ -178,6 +179,6 @@ rule apply_base_recalibration:
         -R {input.refg} \
         -I {input.bam} \
         --bqsr-recal-file {input.bsqr_recal} \
-        -O {output} \
+        -O {output.bam} \
         --tmp-dir {params.tmp_dir}
         """
