@@ -96,9 +96,13 @@ rule somaticseq_compress:
         indel_vcf="vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf",
     output:
         snv_vcf_gz=temp("vcf/{run}/{sample}/somaticseq/Consensus.sSNV.contigs.vcf.gz"),
-        indel_vcf_gz=temp("vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz"),
+        indel_vcf_gz=temp(
+            "vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz"
+        ),
         snv_tbi=temp("vcf/{run}/{sample}/somaticseq/Consensus.sSNV.contigs.vcf.gz.tbi"),
-        indel_tbi=temp("vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz.tbi"),
+        indel_tbi=temp(
+            "vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz.tbi"
+        ),
     conda:
         "../envs/sam_vcf_tools.yaml"
     shell:
@@ -115,7 +119,7 @@ rule somaticseq_concat:
         snv_vcf_gz="vcf/{run}/{sample}/somaticseq/Consensus.sSNV.contigs.vcf.gz",
         indel_vcf_gz="vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz",
         snv_tbi="vcf/{run}/{sample}/somaticseq/Consensus.sSNV.contigs.vcf.gz.tbi",
-        indel_tbi="vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz.tbi"
+        indel_tbi="vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz.tbi",
     output:
         merged=temp("vcf/{run}/{sample}/somaticseq/Consensus.merged.vcf"),
     conda:
