@@ -121,7 +121,7 @@ rule somaticseq_concat:
         snv_tbi="vcf/{run}/{sample}/somaticseq/Consensus.sSNV.contigs.vcf.gz.tbi",
         indel_tbi="vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz.tbi",
     output:
-        merged=temp("vcf/{run}/{sample}/somaticseq/Consensus.merged.vcf"),
+        merged=temp("vcf/{run}/{sample}/somaticseq/{sample}.consensus.merged.vcf"),
     conda:
         "../envs/sam_vcf_tools.yaml"
     shell:
@@ -132,12 +132,12 @@ rule somaticseq_concat:
 
 rule funcotator:
     input:
-        vcf="vcf/{run}/{sample}/somaticseq/Consensus.merged.vcf",
+        vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.merged.vcf",
         refg=config["paths"]["refs"]["genome_human"],
         data_sources=config["paths"]["refs"]["funcotator_data_sources"],
     output:
-        vcf="vcf/{run}/{sample}/somaticseq/Consensus.annotated.vcf",
-        idx="vcf/{run}/{sample}/somaticseq/Consensus.annotated.vcf.idx",
+        vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.annotated.vcf",
+        idx="vcf/{run}/{sample}/somaticseq/{sample}.consensus.annotated.vcf.idx",
     params:
         gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
@@ -161,4 +161,17 @@ rule funcotator:
         --output-file-format VCF \
         --variant {input.vcf} \
         --output {output.vcf}
+        """
+
+
+rule somaticseq_filter:
+    input:
+        vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.annotated.vcf",
+    output:
+        vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.filtered.vcf",
+    conda:
+        "../envs/sam_vcf_tools.yaml"
+    shell:
+        """
+        bcftools view -f PASS {input.vcf} -o {output.vcf}
         """
