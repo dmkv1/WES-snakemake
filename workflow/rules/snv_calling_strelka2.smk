@@ -104,18 +104,16 @@ rule run_strelka:
         """
 
 
-rule concat_strelka_vcfs:
+rule sort_strelka_calls:
     input:
-        vcf_snv="vcf/{run}/{sample}/strelka/results/variants/somatic.snvs.vcf.gz",
-        tbi_snv="vcf/{run}/{sample}/strelka/results/variants/somatic.snvs.vcf.gz.tbi",
-        vcf_indel="vcf/{run}/{sample}/strelka/results/variants/somatic.indels.vcf.gz",
-        tbi_indel="vcf/{run}/{sample}/strelka/results/variants/somatic.indels.vcf.gz.tbi",
+        vcf_gz="vcf/{run}/{sample}/strelka/results/variants/somatic.snvs.vcf.gz",
+        tbi="vcf/{run}/{sample}/strelka/results/variants/somatic.snvs.vcf.gz.tbi",
+        bed="refs/regions/regions.bed.gz",
     output:
-        vcf="vcf/{run}/{sample}/{sample}.strelka.vcf",
+        vcf="vcf/{run}/{sample}/strelka/results/variants/{sample}.strelka.sorted.vcf",
     conda:
-        "../envs/manta.yaml"
+        "../envs/sam_vcf_tools.yaml"
     shell:
         """
-        bcftools concat -a --allow-overlaps {input.vcf_snv} {input.vcf_indel} | \
-        bcftools sort -Ov -o {output.vcf}
+        bcftools view -R {input.bed} {input.vcf_gz} | bcftools sort -Ov -o {output.vcf}
         """

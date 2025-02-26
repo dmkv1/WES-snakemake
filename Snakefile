@@ -4,7 +4,7 @@ import pandas as pd
 configfile: "config.yaml"
 
 
-samples = pd.read_excel("mock_fastq/fastq.groups.xlsx")
+samples = pd.read_excel("fastq.groups.xlsx")
 
 # Create a dictionary of runs and their samples
 runs_dict = {}
@@ -75,17 +75,7 @@ rule all:
             for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
         ],
         [
-            f"vcf/{run}/{sample}/{sample}.mutect2.vcf"
-            for run in runs_dict
-            for sample in runs_dict[run]["tumors"]
-        ],
-        [
-            f"vcf/{run}/{sample}/{sample}.varscan.vcf"
-            for run in runs_dict
-            for sample in runs_dict[run]["tumors"]
-        ],
-        [
-            f"vcf/{run}/{sample}/{sample}.strelka.vcf"
+            f"vcf/{run}/{sample}/somaticseq/Consensus.annotated.vcf"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],

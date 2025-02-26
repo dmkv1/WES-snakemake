@@ -1,9 +1,8 @@
-name: manta
+name: sam_vcf_tools
 channels:
   - bioconda
   - conda-forge
   - defaults
 dependencies:
-  - manta=1.6.0
   - samtools=1.19
   - bcftools=1.19

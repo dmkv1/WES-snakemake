@@ -17,8 +17,6 @@ paths:
     germline_resource: "/media/data/NGS/refs/gatk-BP-somatic-hg38/af-only-gnomad.hg38.vcf.gz"
     ## Funcotator
     funcotator_data_sources: "/media/data/NGS/refs/funcotator/funcotator_dataSources.v1.8.hg38.20230908s"
-    ## Exome regions
-    regions_bedfile: "/media/data/NGS/refs/SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
 
 resources:
   threads: 48
@@ -37,3 +35,22 @@ tools:
 params:
     library_prep: "SureSelectV8UTR"
     genome_version: "hg38" # need to be specified for Funcotator
+    # VarScan
+    varscan_min_coverage: 5 # Minimum coverage in normal and tumor to call variant
+    varscan_min_var_freq: 0.05 # Minimum variant frequency to call a heterozygote
+    varscan_p_value: 0.99 # P-value threshold to call a heterozygote
+    varscan_somatic_p_value: 0.01 # P-value threshold to call a somatic site
+    varscan_filter_min_coverage: 5
+    varscan_filter_p_value: 0.01 # Default p-value threshold for calling variants [1e-01]
+    varscan_filter_min_reads: 2 # Minimum supporting reads for a variant [2]
+    varscan_filter_min_strands: 1 # Minimum # of strands on which variant observed (1 or 2) [1]
+    varscan_filter_min_avg_qual: 20 # Minimum average base quality for variant-supporting reads [20]
+    varscan_filter_min_var_freq: 0.05 # Minimum variant allele frequency threshold [0.20]
+    # SomaticSeq
+    somaticseq_pass_threshold: 0.5 # SCORE for PASS (default: 0.5)
+    somaticseq_lowqual_threshold: 0.1 # SCORE for LowQual (default: 0.1)
+    somaticseq_homozygous_threshold: 0.85 # VAF for homozygous (default: 0.85)
+    somaticseq_heterozygous_threshold: 0.01 # VAF for heterozygous (default: 0.01)
+    somaticseq_minimum_mapping_quality: 1 # Minimum mapping quality below which is considered poor (default: 1)
+    somaticseq_minimum_base_quality: 5 # Minimum base quality below which is considered poor (default: 5)
+    somaticseq_minimum_num_callers: 1 # Minimum number of tools to be considered (default: 0.5)

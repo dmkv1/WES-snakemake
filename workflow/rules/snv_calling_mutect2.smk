@@ -20,9 +20,9 @@ rule run_mutect2:
         refg=config["paths"]["refs"]["genome_human"],
         regions="refs/regions/regions.bed",
     output:
-        vcf=temp("vcf/{run}/{sample}/{sample}.mutect2.unfiltered.vcf"),
-        idx=temp("vcf/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.idx"),
-        stats="vcf/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.stats",
+        vcf=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf"),
+        idx=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.idx"),
+        stats="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.stats",
     params:
         gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
@@ -57,13 +57,14 @@ rule run_mutect2:
 
 rule filter_mutect2_calls:
     input:
-        vcf="vcf/{run}/{sample}/{sample}.mutect2.unfiltered.vcf",
-        stats="vcf/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.stats",
+        vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf",
+        idx="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.idx",
+        stats="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.stats",
         refg=config["paths"]["refs"]["genome_human"],
     output:
-        vcf="vcf/{run}/{sample}/{sample}.mutect2.vcf",
-        idx="vcf/{run}/{sample}/{sample}.mutect2.vcf.idx",
-        filtering_stats="metrics/{run}/{sample}/{sample}.mutect2.filteringStats.tsv",
+        vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf",
+        idx="vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf.idx",
+        filtering_stats="metrics/{run}/{sample}/{sample}.mutect2.filtered.filteringStats.tsv",
     params:
         gatk_image=config["tools"]["gatk_image"],
         gatk_ver=config["tools"]["gatk_version"],
@@ -85,4 +86,21 @@ rule filter_mutect2_calls:
         -O {output.vcf} \
         --stats {input.stats} \
         --filtering-stats {output.filtering_stats}
+        """
+
+
+rule sort_mutect2_calls:
+    input:
+        vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf",
+        bed="refs/regions/regions.bed.gz",
+    output:
+        vcf_gz=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf.gz"),
+        vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.sorted.vcf",
+    conda:
+        "../envs/sam_vcf_tools.yaml"
+    shell:
+        """
+        bgzip -c {input.vcf} > {output.vcf_gz}
+        tabix -p vcf {output.vcf_gz}
+        bcftools view -R {input.bed} {output.vcf_gz} | bcftools sort -Ov -o {output.vcf}
         """
