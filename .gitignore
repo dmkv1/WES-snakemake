@@ -9,6 +9,7 @@ __pycache__/
 *$py.class
 
 # Data
+input.fastq.xlsx
 refs/
 bam/
 metrics/
