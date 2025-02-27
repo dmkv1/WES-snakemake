@@ -4,7 +4,7 @@ import pandas as pd
 configfile: "config.yaml"
 
 
-samples = pd.read_excel("fastq.groups.xlsx")
+samples = pd.read_excel("input.fastq.xlsx")
 
 # Create a dictionary of runs and their samples
 runs_dict = {}

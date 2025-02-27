@@ -21,8 +21,6 @@ tmp/
 *.bam
 *.vcf
 *.vcf.gz
-*.xlsx
-*.xls
 *.csv
 *.log
 *.tbi
