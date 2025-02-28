@@ -19,7 +19,7 @@ paths:
     funcotator_data_sources: "/media/data/NGS/refs/funcotator/funcotator_dataSources.v1.8.hg38.20230908s"
 
 resources:
-  threads: 48
+  threads: 64
   java_max_gb: 480
   java_min_gb: 80
   strelka_max_gb: 480

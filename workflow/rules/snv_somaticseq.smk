@@ -121,57 +121,10 @@ rule somaticseq_concat:
         snv_tbi="vcf/{run}/{sample}/somaticseq/Consensus.sSNV.contigs.vcf.gz.tbi",
         indel_tbi="vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz.tbi",
     output:
-        merged=temp("vcf/{run}/{sample}/somaticseq/{sample}.consensus.merged.vcf"),
+        merged="vcf/{run}/{sample}/somaticseq/{sample}.consensus.merged.vcf",
     conda:
         "../envs/sam_vcf_tools.yaml"
     shell:
         """
         bcftools concat {input.snv_vcf_gz} {input.indel_vcf_gz} -a -Ov -o {output.merged}
-        """
-
-
-rule funcotator:
-    input:
-        vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.merged.vcf",
-        refg=config["paths"]["refs"]["genome_human"],
-        data_sources=config["paths"]["refs"]["funcotator_data_sources"],
-    output:
-        vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.annotated.vcf",
-        idx="vcf/{run}/{sample}/somaticseq/{sample}.consensus.annotated.vcf.idx",
-    params:
-        gatk_image=config["tools"]["gatk_image"],
-        gatk_ver=config["tools"]["gatk_version"],
-        ref_path=config["paths"]["refs"]["path"],
-        genome_ver=config["params"]["genome_version"],
-    resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-    shell:
-        """
-        docker run --rm \
-        -v {params.ref_path}:{params.ref_path} \
-        -v $PWD:$PWD -w $PWD \
-        --user $(id -u):$(id -g) \
-        {params.gatk_image}:{params.gatk_ver} gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
-        Funcotator \
-        --reference {input.refg} \
-        --ref-version {params.genome_ver} \
-        --data-sources-path {input.data_sources} \
-        --output-file-format VCF \
-        --variant {input.vcf} \
-        --output {output.vcf}
-        """
-
-
-rule somaticseq_filter:
-    input:
-        vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.annotated.vcf",
-    output:
-        vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.filtered.vcf",
-    conda:
-        "../envs/sam_vcf_tools.yaml"
-    shell:
-        """
-        bcftools view -f PASS {input.vcf} -o {output.vcf}
         """
