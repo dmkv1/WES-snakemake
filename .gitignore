@@ -2,6 +2,7 @@
 .snakemake/
 results/
 logs/
+snakemake.pid
 
 # Python
 __pycache__/
