@@ -2,7 +2,7 @@ rule export_bed:
     input:
         vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.merged.vcf",
     output:
-        bed="results/{run}/{sample}/{sample}.snv_indels.bed",
+        bed=temp("vcf/{run}/{sample}/depth/{sample}.snv_indels.bed"),
     conda:
         "../envs/sam_vcf_tools.yaml"
     shell:
@@ -13,7 +13,7 @@ rule export_bed:
 
 rule calculate_depth:
     input:
-        bed=lambda w: f"results/{w.run}/{w.sample}/{w.sample}.snv_indels.bed",
+        bed=lambda w: f"vcf/{w.run}/{w.sample}/depth/{w.sample}.snv_indels.bed",
         normal_bam=lambda w: f"bam/{w.run}/{runs_dict[w.run]['normal']}.bam",
         tumor_bam=lambda w: f"bam/{w.run}/{w.sample}.bam",
     output:
