@@ -65,6 +65,8 @@ include: "workflow/rules/snv_calling_mutect2.smk"
 include: "workflow/rules/snv_calling_varscan2.smk"
 include: "workflow/rules/snv_calling_strelka2.smk"
 include: "workflow/rules/snv_somaticseq.smk"
+include: "workflow/rules/snv_variant_depth.smk"
+include: "workflow/rules/snv_vcf_annotation.smk"
 include: "workflow/rules/vcf_to_table.smk"
 
 
@@ -76,12 +78,12 @@ rule all:
             for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
         ],
         [
-            f"vcf/{run}/{sample}/somaticseq/{sample}.consensus.filtered.vcf"
+            f"results/{run}/{sample}/{sample}.snv_indels.vcf"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
         [
-            f"tables/{run}/{sample}/{sample}.snv_indels.xlsx"
+            f"results/{run}/{sample}/{sample}.snv_indels.xlsx"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],

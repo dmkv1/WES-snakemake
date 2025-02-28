@@ -59,10 +59,15 @@ vaf.df <- as.data.frame(geno(vcf)[["VAF"]]) %>%
 
 gt.df <- as.data.frame(geno(vcf)[["GT"]]) %>%
   mutate_all( ~ unlist(.)) %>%
-  setNames(., paste0("GT_", colnames(.))) 
-  
+  setNames(., paste0("GT_", colnames(.)))
+
+dp.df <- as.data.frame(geno(vcf)[["DP"]]) %>%
+  mutate_all( ~ unlist(.)) %>%
+  setNames(., paste0("DP_", colnames(.)))
+
 
 result <- cbind(vaf.df, gt.df) %>%
+  cbind(., dp.df) %>%
   cbind(., funcotation) %>%
   rownames_to_column("Variant") %>%
   mutate(Position_hg38 = word(Variant, 1, sep = "_"),
@@ -75,6 +80,7 @@ result <- cbind(vaf.df, gt.df) %>%
     "FILTER",
     VAF_NORMAL, VAF_TUMOR,
     GT_NORMAL, GT_TUMOR,
+    DP_NORMAL, DP_TUMOR,
     contains("Gencode_"),
     "HGNC_HGNC_ID",
     "HGNC_Approved_name",

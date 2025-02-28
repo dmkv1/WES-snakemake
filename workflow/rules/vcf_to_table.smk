@@ -1,6 +1,6 @@
 rule vcf_to_table:
     input:
-        vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.filtered.vcf",
+        vcf="results/{run}/{sample}/{sample}.snv_indels.vcf",
     output:
         xlsx="results/{run}/{sample}/{sample}.snv_indels.xlsx",
     script:
