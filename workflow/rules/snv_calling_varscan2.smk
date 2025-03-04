@@ -4,7 +4,7 @@ rule samtools_mpileup:
         tumor=lambda w: f"bam/{w.run}/{w.sample}.bam",
         refg=config["paths"]["refs"]["genome_human"],
     output:
-        mpileup=temp("mpileup/{run}/{sample}.mpileup"),
+        mpileup="mpileup/{run}/{sample}.mpileup",
     conda:
         "../envs/varscan.yaml"
     threads: config["resources"]["threads"]
