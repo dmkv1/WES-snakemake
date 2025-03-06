@@ -10,8 +10,9 @@ __pycache__/
 *$py.class
 
 # Data
-input.fastq.xlsx
+*.xlsx
 refs/
+fastq/
 bam/
 metrics/
 vcf/
@@ -20,6 +21,8 @@ somaticseq/
 tmp/
 *.fastq
 *.fastq.gz
+*.fq
+*.fq.gz
 *.bam
 *.vcf
 *.vcf.gz

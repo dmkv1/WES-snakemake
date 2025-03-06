@@ -41,5 +41,5 @@ rule somaticseq_filter:
         "../envs/sam_vcf_tools.yaml"
     shell:
         """
-        bcftools view -f PASS {input.vcf} -o {output.vcf_final}
+        bcftools view -f PASS {input.vcf} | bcftools sort -Ov -o {output.vcf_final}
         """
