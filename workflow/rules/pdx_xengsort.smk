@@ -34,7 +34,6 @@ rule run_xengsort:
     output:
         graft1=temp("fastq/{run}/{sample}/{sample}.xengsort-graft.1.fq.gz"),
         graft2=temp("fastq/{run}/{sample}/{sample}.xengsort-graft.2.fq.gz"),
-
     params:
         index="refs/xengsort/xengsort-k25",
         outprefix="fastq/{run}/{sample}/{sample}.xengsort",
