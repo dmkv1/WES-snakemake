@@ -1,8 +1,18 @@
 rule bwa_map:
     input:
         refg=config["paths"]["refs"]["genome_human"],
-        fq1=get_fastq1,
-        fq2=get_fastq2,
+        fq1=lambda wildcards: (
+            f"fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}.xengsort-graft.1.fq.gz"
+            if wildcards.run in pdx_dict
+            and wildcards.sample in pdx_dict[wildcards.run]
+            else get_fastq1(wildcards)
+        ),
+        fq2=lambda wildcards: (
+            f"fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}.xengsort-graft.2.fq.gz"
+            if wildcards.run in pdx_dict
+            and wildcards.sample in pdx_dict[wildcards.run]
+            else get_fastq2(wildcards)
+        ),
     output:
         temp("bam/{run}/{sample}.raw.bam"),
     threads: config["resources"]["threads"]
@@ -101,16 +111,7 @@ rule mark_duplicates:
 
 rule create_base_recalibration:
     input:
-        bam=lambda wildcards: (
-            "bam/{run}/{sample}.xenofiltered.bam".format(
-                run=wildcards.run, sample=wildcards.sample
-            )
-            if wildcards.run in pdx_dict
-            and wildcards.sample in pdx_dict[wildcards.run]
-            else "bam/{run}/{sample}.md.bam".format(
-                run=wildcards.run, sample=wildcards.sample
-            )
-        ),
+        bam="bam/{run}/{sample}.md.bam",
         refg=config["paths"]["refs"]["genome_human"],
     output:
         recal_data="metrics/{run}/{sample}/{sample}.recal_data.table",
@@ -145,16 +146,7 @@ rule create_base_recalibration:
 rule apply_base_recalibration:
     input:
         refg=config["paths"]["refs"]["genome_human"],
-        bam=lambda wildcards: (
-            "bam/{run}/{sample}.xenofiltered.bam".format(
-                run=wildcards.run, sample=wildcards.sample
-            )
-            if wildcards.run in pdx_dict
-            and wildcards.sample in pdx_dict[wildcards.run]
-            else "bam/{run}/{sample}.md.bam".format(
-                run=wildcards.run, sample=wildcards.sample
-            )
-        ),
+        bam="bam/{run}/{sample}.md.bam",
         bsqr_recal="metrics/{run}/{sample}/{sample}.recal_data.table",
     output:
         bam="bam/{run}/{sample}.bam",
