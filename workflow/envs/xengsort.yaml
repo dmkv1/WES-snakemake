@@ -1,0 +1,7 @@
+name: xengsort
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - xengsort=2.0.8
