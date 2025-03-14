@@ -4,7 +4,7 @@ import pandas as pd
 configfile: "config.yaml"
 
 
-samples = pd.read_excel("input.fastq.xlsx")
+samples = pd.read_excel(config["paths"]["input_table"])
 
 # Create a dictionary of runs and their samples
 runs_dict = {}
@@ -13,8 +13,8 @@ for run in samples["run"].unique():
         continue
     run_samples = samples[samples["run"] == run]
     runs_dict[run] = {
-        "normal": run_samples[run_samples["Type"] == "CTRL"]["samplename"].iloc[0],
-        "tumors": run_samples[run_samples["Type"] != "CTRL"]["samplename"].tolist(),
+        "normal": run_samples[run_samples["type"] == "CTRL"]["samplename"].iloc[0],
+        "tumors": run_samples[run_samples["type"] != "CTRL"]["samplename"].tolist(),
     }
 
 # Create a dictionary of PDX samples
@@ -23,7 +23,7 @@ for run in samples["run"].unique():
     if pd.isna(run):
         continue
     run_samples = samples[samples["run"] == run]
-    pdx_samples = run_samples[run_samples["Type"] == "PDX"]["samplename"].tolist()
+    pdx_samples = run_samples[run_samples["type"] == "PDX"]["samplename"].tolist()
     if pdx_samples:  # Only add the run if it has PDX samples
         pdx_dict[run] = pdx_samples
 

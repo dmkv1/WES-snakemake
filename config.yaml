@@ -1,4 +1,5 @@
 paths:
+  input_table: "input.xlsx"
   refs:
     # Path to the reference folder for container mounting
     path: "/media/data/NGS/refs"
@@ -25,32 +26,41 @@ resources:
   strelka_max_gb: 480
 
 tools:
-  gatk_image: "broadinstitute/gatk"
-  gatk_version: "4.6.1.0"
-  strelka_image: "mcfonsecalab/strelka"
-  strelka_version: "2.9.10"
-  somaticseq_image: "lethalfang/somaticseq"
-  somaticseq_version: "latest"
+  gatk:
+    image: "broadinstitute/gatk"
+    version: "4.6.1.0"
+  strelka:
+    image: "mcfonsecalab/strelka"
+    version: "2.9.10"
+  somaticseq:
+    image: "lethalfang/somaticseq"
+    version: "latest"
 
 params:
     library_prep: "SureSelectV8UTR"
     genome_version: "hg38" # need to be specified for Funcotator
-    # VarScan
-    varscan_min_coverage: 5 # Minimum coverage in normal and tumor to call variant
-    varscan_min_var_freq: 0.05 # Minimum variant frequency to call a heterozygote
-    varscan_p_value: 0.99 # P-value threshold to call a heterozygote
-    varscan_somatic_p_value: 0.01 # P-value threshold to call a somatic site
-    varscan_filter_min_coverage: 5
-    varscan_filter_p_value: 0.01 # Default p-value threshold for calling variants [1e-01]
-    varscan_filter_min_reads: 2 # Minimum supporting reads for a variant [2]
-    varscan_filter_min_strands: 1 # Minimum # of strands on which variant observed (1 or 2) [1]
-    varscan_filter_min_avg_qual: 20 # Minimum average base quality for variant-supporting reads [20]
-    varscan_filter_min_var_freq: 0.05 # Minimum variant allele frequency threshold [0.20]
-    # SomaticSeq
-    somaticseq_pass_threshold: 0.5 # SCORE for PASS (default: 0.5)
-    somaticseq_lowqual_threshold: 0.1 # SCORE for LowQual (default: 0.1)
-    somaticseq_homozygous_threshold: 0.85 # VAF for homozygous (default: 0.85)
-    somaticseq_heterozygous_threshold: 0.01 # VAF for heterozygous (default: 0.01)
-    somaticseq_minimum_mapping_quality: 1 # Minimum mapping quality below which is considered poor (default: 1)
-    somaticseq_minimum_base_quality: 5 # Minimum base quality below which is considered poor (default: 5)
-    somaticseq_minimum_num_callers: 1 # Minimum number of tools to be considered (default: 0.5)
+    xengsort:
+      index_size: 4500000000
+      index_fill: 0.88
+      index_k: 25
+      chunksize: 16.0
+      prefetch: 1
+    varscan:
+      min_coverage: 5 # Minimum coverage in normal and tumor to call variant
+      min_var_freq: 0.05 # Minimum variant frequency to call a heterozygote
+      p_value: 0.99 # P-value threshold to call a heterozygote
+      somatic_p_value: 0.01 # P-value threshold to call a somatic site
+      filter_min_coverage: 5
+      filter_p_value: 0.01 # Default p-value threshold for calling variants [1e-01]
+      filter_min_reads: 2 # Minimum supporting reads for a variant [2]
+      filter_min_strands: 1 # Minimum # of strands on which variant observed (1 or 2) [1]
+      filter_min_avg_qual: 20 # Minimum average base quality for variant-supporting reads [20]
+      filter_min_var_freq: 0.05 # Minimum variant allele frequency threshold [0.20]
+    somaticseq:
+      pass_threshold: 0.5 # SCORE for PASS (default: 0.5)
+      lowqual_threshold: 0.1 # SCORE for LowQual (default: 0.1)
+      homozygous_threshold: 0.85 # VAF for homozygous (default: 0.85)
+      heterozygous_threshold: 0.01 # VAF for heterozygous (default: 0.01)
+      minimum_mapping_quality: 1 # Minimum mapping quality below which is considered poor (default: 1)
+      minimum_base_quality: 5 # Minimum base quality below which is considered poor (default: 5)
+      minimum_num_callers: 1 # Minimum number of tools to be considered (default: 0.5)

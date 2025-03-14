@@ -39,8 +39,15 @@ rule run_manta:
         mem_gb=config["resources"]["strelka_max_gb"],
     conda:
         "../envs/manta.yaml"
+    log:
+        "logs/{run}/{sample}/Manta.log",
     shell:
-        "{input.workflow} --mode local --jobs {resources.threads} --memGb {resources.mem_gb}"
+        """
+        {input.workflow} \
+        --mode local \
+        --jobs {resources.threads} --memGb {resources.mem_gb} \
+        > {log} 2>&1
+        """
 
 
 rule configure_strelka:
@@ -58,8 +65,8 @@ rule configure_strelka:
     params:
         run_path="vcf/{run}/{sample}/strelka",
         ref_path=config["paths"]["refs"]["path"],
-        strelka_image=config["tools"]["strelka_image"],
-        strelka_ver=config["tools"]["strelka_version"],
+        strelka_image=config["tools"]["strelka"]["image"],
+        strelka_ver=config["tools"]["strelka"]["version"],
     shell:
         """
         docker run --rm \
@@ -88,11 +95,13 @@ rule run_strelka:
     params:
         run_path="vcf/{run}/{sample}/strelka",
         ref_path=config["paths"]["refs"]["path"],
-        strelka_image=config["tools"]["strelka_image"],
-        strelka_ver=config["tools"]["strelka_version"],
+        strelka_image=config["tools"]["strelka"]["image"],
+        strelka_ver=config["tools"]["strelka"]["version"],
     resources:
         threads=config["resources"]["threads"],
         mem_gb=config["resources"]["strelka_max_gb"],
+    log:
+        "logs/{run}/{sample}/Strelka.log",
     shell:
         """
         docker run --rm \
@@ -100,7 +109,8 @@ rule run_strelka:
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
         {params.strelka_image}:{params.strelka_ver} \
-        {input.workflow} --mode local --jobs 8 --memGb {resources.mem_gb}
+        {input.workflow} --mode local --jobs 8 --memGb {resources.mem_gb} \
+        > {log} 2>&1
         """
 
 

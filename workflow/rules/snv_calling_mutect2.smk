@@ -24,8 +24,8 @@ rule run_mutect2:
         idx=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.idx"),
         stats="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.stats",
     params:
-        gatk_image=config["tools"]["gatk_image"],
-        gatk_ver=config["tools"]["gatk_version"],
+        gatk_image=config["tools"]["gatk"]["image"],
+        gatk_ver=config["tools"]["gatk"]["version"],
         normal_name=get_normal_sample,
         # Multisample mode - incompartible with the rest of the callers
         # tumor_inputs=get_tumor_inputs,
@@ -35,6 +35,8 @@ rule run_mutect2:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "logs/{run}/{sample}/Mutect2.log",
     shell:
         """
         docker run --rm \
@@ -51,7 +53,8 @@ rule run_mutect2:
         -I {input.normal} \
         -I {input.tumor} \
         -normal {params.normal_name} \
-        -O {output.vcf}
+        -O {output.vcf} \
+        > {log} 2>&1
         """
 
 
@@ -66,12 +69,14 @@ rule filter_mutect2_calls:
         idx="vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf.idx",
         filtering_stats="metrics/{run}/{sample}/{sample}.mutect2.filtered.filteringStats.tsv",
     params:
-        gatk_image=config["tools"]["gatk_image"],
-        gatk_ver=config["tools"]["gatk_version"],
+        gatk_image=config["tools"]["gatk"]["image"],
+        gatk_ver=config["tools"]["gatk"]["version"],
         ref_path=config["paths"]["refs"]["path"],
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "logs/{run}/{sample}/FilterMutectCalls.log",
     shell:
         """
         docker run --rm \
@@ -85,7 +90,8 @@ rule filter_mutect2_calls:
         -V {input.vcf} \
         -O {output.vcf} \
         --stats {input.stats} \
-        --filtering-stats {output.filtering_stats}
+        --filtering-stats {output.filtering_stats} \
+        > {log} 2>&1
         """
 
 

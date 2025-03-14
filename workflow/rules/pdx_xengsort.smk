@@ -3,18 +3,18 @@ rule build_xengsort_index:
         refg_human=config["paths"]["refs"]["genome_human"],
         refg_host=config["paths"]["refs"]["genome_host"],
     output:
-        info="refs/xengsort/xengsort-k25.info",
-        hash="refs/xengsort/xengsort-k25.hash",
-    log:
-        "logs/xengsort/xengsort-k25.log",
+        info="refs/xengsort/xengsort-index.info",
+        hash="refs/xengsort/xengsort-index.hash",
     params:
-        index="refs/xengsort/xengsort-k25",
-        size=4500000000,
-        fill=0.88,
-        k=25,
+        index="refs/xengsort/xengsort-index",
+        size=config["params"]["xengsort"]["index_size"],
+        fill=config["params"]["xengsort"]["index_fill"],
+        k=config["params"]["xengsort"]["index_k"],
     conda:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
+    log:
+        "logs/xengsort/xengsort-index.log",
     shell:
         """
         xengsort index --index {params.index} \
@@ -27,23 +27,23 @@ rule build_xengsort_index:
 
 rule run_xengsort:
     input:
-        index_info="refs/xengsort/xengsort-k25.info",
-        index_hash="refs/xengsort/xengsort-k25.hash",
+        index_info="refs/xengsort/xengsort-index.info",
+        index_hash="refs/xengsort/xengsort-index.hash",
         fq1=get_fastq1,
         fq2=get_fastq2,
     output:
         graft1=temp("fastq/{run}/{sample}/{sample}.xengsort-graft.1.fq.gz"),
         graft2=temp("fastq/{run}/{sample}/{sample}.xengsort-graft.2.fq.gz"),
     params:
-        index="refs/xengsort/xengsort-k25",
+        index="refs/xengsort/xengsort-index",
         outprefix="fastq/{run}/{sample}/{sample}.xengsort",
-        chunksize=16.0,
-        prefetch=1,
-    log:
-        "logs/xengsort/{run}/{sample}.log",
+        chunksize=config["params"]["xengsort"]["chunksize"],
+        prefetch=config["params"]["xengsort"]["prefetch"],
     conda:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
+    log:
+        "logs/{run}/{sample}/xengsort.log",
     shell:
         """
         xengsort classify --out {params.outprefix} \

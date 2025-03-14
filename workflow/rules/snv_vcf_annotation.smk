@@ -7,13 +7,15 @@ rule funcotator:
         vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.annotated.vcf",
         idx="vcf/{run}/{sample}/somaticseq/{sample}.consensus.annotated.vcf.idx",
     params:
-        gatk_image=config["tools"]["gatk_image"],
-        gatk_ver=config["tools"]["gatk_version"],
+        gatk_image=config["tools"]["gatk"]["image"],
+        gatk_ver=config["tools"]["gatk"]["version"],
         ref_path=config["paths"]["refs"]["path"],
         genome_ver=config["params"]["genome_version"],
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "logs/{run}/{sample}/Funcotator.log",
     shell:
         """
         docker run --rm \
@@ -28,7 +30,8 @@ rule funcotator:
         --data-sources-path {input.data_sources} \
         --output-file-format VCF \
         --variant {input.vcf} \
-        --output {output.vcf}
+        --output {output.vcf} \
+        > {log} 2>&1
         """
 
 
@@ -36,7 +39,7 @@ rule somaticseq_filter:
     input:
         vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.annotated.vcf",
     output:
-        vcf_final="results/{run}/{sample}/{sample}.snv_indels.vcf"
+        vcf_final="results/{run}/{sample}/{sample}.snv_indels.vcf",
     conda:
         "../envs/sam_vcf_tools.yaml"
     shell:

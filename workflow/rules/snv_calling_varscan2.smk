@@ -25,12 +25,14 @@ rule varscan_somatic:
         snp=temp("vcf/{run}/{sample}/varscan/{sample}.varscan.snp.vcf"),
         indel="vcf/{run}/{sample}/varscan/{sample}.varscan.indel.vcf",
     params:
-        min_coverage=config["params"]["varscan_min_coverage"],
-        min_var_freq=config["params"]["varscan_min_var_freq"],
-        p_value=config["params"]["varscan_p_value"],
-        somatic_p_value=config["params"]["varscan_somatic_p_value"],
+        min_coverage=config["params"]["varscan"]["min_coverage"],
+        min_var_freq=config["params"]["varscan"]["min_var_freq"],
+        p_value=config["params"]["varscan"]["p_value"],
+        somatic_p_value=config["params"]["varscan"]["somatic_p_value"],
     conda:
         "../envs/varscan.yaml"
+    log:
+        "logs/{run}/{sample}/varscan_somatic.log",
     shell:
         """
         varscan somatic \
@@ -43,7 +45,8 @@ rule varscan_somatic:
         --p-value {params.p_value} \
         --somatic-p-value {params.somatic_p_value} \
         --strand-filter 1 \
-        --output-vcf 1
+        --output-vcf 1 \
+        > {log} 2>&1
         """
 
 
@@ -54,14 +57,16 @@ rule varscan_filter:
     output:
         vcf="vcf/{run}/{sample}/varscan/{sample}.varscan.filtered_snp.vcf",
     params:
-        min_coverage=config["params"]["varscan_filter_min_coverage"],
-        min_reads=config["params"]["varscan_filter_min_reads"],
-        min_strands=config["params"]["varscan_filter_min_strands"],
-        min_avg_qual=config["params"]["varscan_filter_min_avg_qual"],
-        min_var_freq=config["params"]["varscan_filter_min_var_freq"],
-        p_value=config["params"]["varscan_filter_p_value"],
+        min_coverage=config["params"]["varscan"]["filter_min_coverage"],
+        min_reads=config["params"]["varscan"]["filter_min_reads"],
+        min_strands=config["params"]["varscan"]["filter_min_strands"],
+        min_avg_qual=config["params"]["varscan"]["filter_min_avg_qual"],
+        min_var_freq=config["params"]["varscan"]["filter_min_var_freq"],
+        p_value=config["params"]["varscan"]["filter_p_value"],
     conda:
         "../envs/varscan.yaml"
+    log:
+        "logs/{run}/{sample}/varscan_somaticFilter.log",
     shell:
         """
         varscan somaticFilter \
@@ -73,7 +78,8 @@ rule varscan_filter:
         --min-avg-qual {params.min_avg_qual} \
         --min-var-freq {params.min_var_freq} \
         --p-value {params.p_value} \
-        --indel-file {input.vcf_indel}
+        --indel-file {input.vcf_indel} \
+        > {log} 2>&1
         """
 
 

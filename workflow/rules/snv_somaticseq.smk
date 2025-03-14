@@ -20,17 +20,21 @@ rule run_somaticseq:
     params:
         outdir=lambda w, output: os.path.dirname(output.snv_vcf),
         ref_path=config["paths"]["refs"]["path"],
-        image=config["tools"]["somaticseq_image"],
-        image_ver=config["tools"]["somaticseq_version"],
-        pass_threshold=config["params"]["somaticseq_pass_threshold"],
-        lowqual_threshold=config["params"]["somaticseq_lowqual_threshold"],
-        homozygous_threshold=config["params"]["somaticseq_homozygous_threshold"],
-        heterozygous_threshold=config["params"]["somaticseq_heterozygous_threshold"],
-        minimum_mapping_quality=config["params"]["somaticseq_minimum_mapping_quality"],
-        minimum_base_quality=config["params"]["somaticseq_minimum_base_quality"],
-        minimum_num_callers=config["params"]["somaticseq_minimum_num_callers"],
+        image=config["tools"]["somaticseq"]["image"],
+        image_ver=config["tools"]["somaticseq"]["version"],
+        pass_threshold=config["params"]["somaticseq"]["pass_threshold"],
+        lowqual_threshold=config["params"]["somaticseq"]["lowqual_threshold"],
+        homozygous_threshold=config["params"]["somaticseq"]["homozygous_threshold"],
+        heterozygous_threshold=config["params"]["somaticseq"]["heterozygous_threshold"],
+        minimum_mapping_quality=config["params"]["somaticseq"][
+            "minimum_mapping_quality"
+        ],
+        minimum_base_quality=config["params"]["somaticseq"]["minimum_base_quality"],
+        minimum_num_callers=config["params"]["somaticseq"]["minimum_num_callers"],
     resources:
         threads=config["resources"]["threads"],
+    log:
+        "logs/{run}/{sample}/somaticseq_parallel.log",
     shell:
         """
         docker run --rm \
@@ -57,7 +61,8 @@ rule run_somaticseq:
             --varscan-snv {input.vcf_varscan_snv} \
             --varscan-indel {input.vcf_varscan_indel} \
             --strelka-snv {input.vcf_strelka_snv} \
-            --strelka-indel {input.vcf_strelka_indel}
+            --strelka-indel {input.vcf_strelka_indel} \
+            > {log} 2>&1
         """
 
 

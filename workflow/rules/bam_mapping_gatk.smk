@@ -16,8 +16,10 @@ rule bwa_map:
     output:
         temp("bam/{run}/{sample}.raw.bam"),
     threads: config["resources"]["threads"]
+    log:
+        "logs/{run}/{sample}/bwamem.log",
     shell:
-        "bwa mem -M -t {threads} {input.refg} {input.fq1} {input.fq2} | samtools view -Sb - > {output}"
+        "(bwa mem -M -t {threads} {input.refg} {input.fq1} {input.fq2} | samtools view -Sb - > {output}) 2> {log}"
 
 
 rule add_read_groups:
@@ -26,13 +28,15 @@ rule add_read_groups:
     output:
         temp("bam/{run}/{sample}.rg.bam"),
     params:
-        gatk_image=config["tools"]["gatk_image"],
-        gatk_ver=config["tools"]["gatk_version"],
+        gatk_image=config["tools"]["gatk"]["image"],
+        gatk_ver=config["tools"]["gatk"]["version"],
         tmp_dir="tmp",
         rg=get_read_group_params,
     resources:
         java_min_gb=config["resources"]["java_min_gb"],
         java_max_gb=config["resources"]["java_max_gb"],
+    log:
+        "logs/{run}/{sample}/AddOrReplaceReadGroups.log",
     shell:
         """
         docker run --rm \
@@ -48,7 +52,8 @@ rule add_read_groups:
         -PU {params.rg[RGPU]} \
         -LB {params.rg[RGLB]} \
         -PL {params.rg[RGPL]} \
-        -TMP_DIR {params.tmp_dir}
+        -TMP_DIR {params.tmp_dir} \
+        > {log} 2>&1
         """
 
 
@@ -58,12 +63,14 @@ rule fix_mate_info:
     output:
         temp("bam/{run}/{sample}.fixmate.bam"),
     params:
-        gatk_image=config["tools"]["gatk_image"],
-        gatk_ver=config["tools"]["gatk_version"],
+        gatk_image=config["tools"]["gatk"]["image"],
+        gatk_ver=config["tools"]["gatk"]["version"],
         tmp_dir="tmp",
     resources:
         java_min_gb=config["resources"]["java_min_gb"],
         java_max_gb=config["resources"]["java_max_gb"],
+    log:
+        "logs/{run}/{sample}/FixMateInformation.log",
     shell:
         """
         docker run --rm \
@@ -76,7 +83,8 @@ rule fix_mate_info:
         -O {output} \
         -SO coordinate \
         -VALIDATION_STRINGENCY SILENT \
-        -TMP_DIR {params.tmp_dir}
+        -TMP_DIR {params.tmp_dir} \
+        > {log} 2>&1
         """
 
 
@@ -87,12 +95,14 @@ rule mark_duplicates:
         bam=temp("bam/{run}/{sample}.md.bam"),
         metrics="metrics/{run}/{sample}/{sample}.dupl_metrics.txt",
     params:
-        gatk_image=config["tools"]["gatk_image"],
-        gatk_ver=config["tools"]["gatk_version"],
+        gatk_image=config["tools"]["gatk"]["image"],
+        gatk_ver=config["tools"]["gatk"]["version"],
         tmp_dir="tmp",
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "logs/{run}/{sample}/MarkDuplicates.log",
     shell:
         """
         docker run --rm \
@@ -105,7 +115,8 @@ rule mark_duplicates:
         -O {output.bam} \
         -M {output.metrics} \
         --CREATE_INDEX false \
-        --TMP_DIR tmp
+        --TMP_DIR tmp \
+        > {log} 2>&1
         """
 
 
@@ -116,8 +127,8 @@ rule create_base_recalibration:
     output:
         recal_data="metrics/{run}/{sample}/{sample}.recal_data.table",
     params:
-        gatk_image=config["tools"]["gatk_image"],
-        gatk_ver=config["tools"]["gatk_version"],
+        gatk_image=config["tools"]["gatk"]["image"],
+        gatk_ver=config["tools"]["gatk"]["version"],
         tmp_dir="tmp",
         ref_path=config["paths"]["refs"]["path"],
         known_sites=lambda _: " ".join(
@@ -126,6 +137,8 @@ rule create_base_recalibration:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "logs/{run}/{sample}/BaseRecalibrator.log",
     shell:
         """
         docker run --rm \
@@ -139,7 +152,8 @@ rule create_base_recalibration:
         -O {output.recal_data} \
         -R {input.refg} \
         {params.known_sites} \
-        --tmp-dir {params.tmp_dir}
+        --tmp-dir {params.tmp_dir} \
+        > {log} 2>&1
         """
 
 
@@ -152,13 +166,15 @@ rule apply_base_recalibration:
         bam="bam/{run}/{sample}.bam",
         bai="bam/{run}/{sample}.bai",
     params:
-        gatk_image=config["tools"]["gatk_image"],
-        gatk_ver=config["tools"]["gatk_version"],
+        gatk_image=config["tools"]["gatk"]["image"],
+        gatk_ver=config["tools"]["gatk"]["version"],
         tmp_dir="tmp",
         ref_path=config["paths"]["refs"]["path"],
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "logs/{run}/{sample}/ApplyBQSR.log",
     shell:
         """
         docker run --rm \
@@ -172,5 +188,6 @@ rule apply_base_recalibration:
         -I {input.bam} \
         --bqsr-recal-file {input.bsqr_recal} \
         -O {output.bam} \
-        --tmp-dir {params.tmp_dir}
+        --tmp-dir {params.tmp_dir} \
+        > {log} 2>&1
         """

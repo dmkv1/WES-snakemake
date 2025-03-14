@@ -17,7 +17,7 @@ rule calculate_depth:
         normal_bam=lambda w: f"bam/{w.run}/{runs_dict[w.run]['normal']}.bam",
         tumor_bam=lambda w: f"bam/{w.run}/{w.sample}.bam",
     output:
-        depth_table="vcf/{run}/{sample}/depth/{sample}.depth.tsv"
+        depth_table="vcf/{run}/{sample}/depth/{sample}.depth.tsv",
     conda:
         "../envs/sam_vcf_tools.yaml"
     shell:
