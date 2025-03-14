@@ -49,7 +49,7 @@ Create an Excel file named `input.xlsx` with the following columns:
 
 * **run**: Run identifier grouping samples from the same experiment
 * **samplename**: Unique sample identifier
-* **Type**: Sample type - "CTRL" for normal samples, "PDX" for xenograft samples, any other value for tumor samples
+* **type**: Sample type - "CTRL" for normal samples, "PDX" for xenograft samples, any other value for tumor samples
 * **fq1**: Full path to R1 FASTQ file
 * **fq2**: Full path to R2 FASTQ file
 
