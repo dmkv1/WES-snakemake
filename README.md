@@ -47,7 +47,7 @@ Provided together with the exome library preparation kit:
 
 Create an Excel file named `input.xlsx` with the following columns:
 
-* **run**: Run identifier grouping samples from the same experiment
+* **run**: Run identifier grouping samples from the same origin
 * **samplename**: Unique sample identifier
 * **type**: Sample type - "CTRL" for normal samples, "PDX" for xenograft samples, any other value for tumor samples
 * **fq1**: Full path to R1 FASTQ file
