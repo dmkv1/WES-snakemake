@@ -1,6 +1,6 @@
 # WES-snakemake: Somatic Variant Calling Pipeline
 
-A Snakemake-based pipeline for calling somatic variants in tumor-normal pairs, with support for Patient-Derived Xenograft (PDX) samples.
+A Snakemake-based pipeline for calling short somatic variants (SNV) in tumor-normal pairs, with support for Patient-Derived Xenograft (PDX) samples. It takes paired-end whole exome sequencing (WES) raw fastqs as input data, aligns and processes them, and uses consensus SNV calling to produce a list of SNVs.
 
 ## Installation and Dependencies
 
