@@ -8,7 +8,7 @@ rule run_somaticseq:
         vcf_mutect=lambda w: f"vcf/{w.run}/{w.sample}/mutect/{w.sample}.mutect2.sorted.vcf",
         vcf_varscan_snv=lambda w: f"vcf/{w.run}/{w.sample}/varscan/{w.sample}.varscan.sorted.vcf",
         vcf_varscan_indel=lambda w: f"vcf/{w.run}/{w.sample}/varscan/{w.sample}.varscan.indel.vcf",
-        vcf_strelka_snv=lambda w: f"vcf/{w.run}/{w.sample}/strelka/results/variants/{w.sample}.strelka.sorted.vcf",
+        vcf_strelka_snv=lambda w: f"vcf/{w.run}/{w.sample}/strelka/vcf_sorted/{w.sample}.strelka.sorted.vcf",
         vcf_strelka_indel=lambda w: f"vcf/{w.run}/{w.sample}/strelka/results/variants/somatic.indels.vcf.gz",
         refg=config["paths"]["refs"]["genome_human"],
         regions="refs/regions/regions.bed",
