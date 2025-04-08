@@ -45,7 +45,7 @@ Provided together with the exome library preparation kit:
 
 ### Sample Table Preparation
 
-Create an Excel file named `input.xlsx` with the following columns:
+Create an Excel file named `samples.xlsx` with the following columns:
 
 * **run**: Run identifier grouping samples from the same origin
 * **samplename**: Unique sample identifier
@@ -182,7 +182,7 @@ Rule graph:
 
 * **Docker permission errors**: Ensure your user is in the docker group with `sudo usermod -aG docker $USER`
 * **Missing reference files**: Verify all paths in `config.yaml` are correct and accessible
-* **Memory issues**: Adjust `java_max_gb` and `java_min_gb` values in the config file if jobs fail due to memory constraints
+* **Memory issues**: Adjust `memory_max_gb` and `memory_min_gb` values in the config file if jobs fail due to memory constraints
 
 ### Logging
 

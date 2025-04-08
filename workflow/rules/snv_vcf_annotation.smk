@@ -12,8 +12,8 @@ rule funcotator:
         ref_path=config["paths"]["refs"]["path"],
         genome_ver=config["params"]["genome_version"],
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
+        memory_max_gb=config["resources"]["memory_max_gb"],
+        memory_min_gb=config["resources"]["memory_min_gb"],
     log:
         "logs/{run}/{sample}/Funcotator.log",
     shell:
@@ -23,7 +23,7 @@ rule funcotator:
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
         {params.gatk_image}:{params.gatk_ver} gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         Funcotator \
         --reference {input.refg} \
         --ref-version {params.genome_ver} \

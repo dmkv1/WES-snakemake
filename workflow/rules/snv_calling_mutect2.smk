@@ -33,18 +33,16 @@ rule run_mutect2:
         ref_path=config["paths"]["refs"]["path"],
     threads: config["resources"]["threads"]
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
+        memory_max_gb=config["resources"]["memory_max_gb"],
+        memory_min_gb=config["resources"]["memory_min_gb"],
     log:
         "logs/{run}/{sample}/Mutect2.log",
+    singularity:
+        "docker://broadinstitute/gatk:4.6.1.0"
     shell:
         """
-        docker run --rm \
-        -v {params.ref_path}:{params.ref_path} \
-        -v $PWD:$PWD -w $PWD \
-        --user $(id -u):$(id -g) \
-        {params.gatk_image}:{params.gatk_ver} gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        gatk \
+        --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         Mutect2 \
         --native-pair-hmm-threads {threads} \
         -R {input.refg} \
@@ -73,8 +71,8 @@ rule filter_mutect2_calls:
         gatk_ver=config["tools"]["gatk"]["version"],
         ref_path=config["paths"]["refs"]["path"],
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
+        memory_max_gb=config["resources"]["memory_max_gb"],
+        memory_min_gb=config["resources"]["memory_min_gb"],
     log:
         "logs/{run}/{sample}/FilterMutectCalls.log",
     shell:
@@ -84,7 +82,7 @@ rule filter_mutect2_calls:
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
         {params.gatk_image}:{params.gatk_ver} gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         FilterMutectCalls \
         -R {input.refg} \
         -V {input.vcf} \

@@ -39,7 +39,7 @@ def parse_fastq_header(fastq_path: str, sample_name: str) -> Dict[str, str]:
         "RGPU": platform_unit,
         "RGSM": sample_name,
         "RGPL": "ILLUMINA",
-        "RGLB": f"{sample_name}_{config['params']['library_prep']}",
+        "RGLB": f"{sample_name}_{config['params']['library_prep_kit']}",
     }
 
 

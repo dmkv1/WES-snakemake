@@ -22,7 +22,7 @@ rule run_manta:
         res_dir="vcf/{run}/{sample}/manta",
     resources:
         threads=config["resources"]["threads"],
-        mem_gb=config["resources"]["strelka_max_gb"],
+        mem_gb=config["resources"]["memory_max_gb"],
     conda:
         "../envs/manta.yaml"
     log:
@@ -70,7 +70,7 @@ rule run_strelka:
         strelka_ver=config["tools"]["strelka"]["version"],
     resources:
         threads=config["resources"]["threads"],
-        mem_gb=config["resources"]["strelka_max_gb"],
+        mem_gb=config["resources"]["memory_max_gb"],
     log:
         "logs/{run}/{sample}/Strelka.log",
     shell:

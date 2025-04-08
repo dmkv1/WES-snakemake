@@ -1,5 +1,6 @@
 rule bwa_map:
     input:
+        refdir=config["paths"]["refs"]["path"],
         refg=config["paths"]["refs"]["genome_human"],
         fq1=lambda wildcards: (
             f"fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}.xengsort-graft.1.fq.gz"
@@ -33,8 +34,8 @@ rule add_read_groups:
         tmp_dir="tmp",
         rg=get_read_group_params,
     resources:
-        java_min_gb=config["resources"]["java_min_gb"],
-        java_max_gb=config["resources"]["java_max_gb"],
+        memory_min_gb=config["resources"]["memory_min_gb"],
+        memory_max_gb=config["resources"]["memory_max_gb"],
     log:
         "logs/{run}/{sample}/AddOrReplaceReadGroups.log",
     shell:
@@ -43,7 +44,7 @@ rule add_read_groups:
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
         {params.gatk_image}:{params.gatk_ver} gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         AddOrReplaceReadGroups \
         -I {input} \
         -O {output} \
@@ -67,8 +68,8 @@ rule fix_mate_info:
         gatk_ver=config["tools"]["gatk"]["version"],
         tmp_dir="tmp",
     resources:
-        java_min_gb=config["resources"]["java_min_gb"],
-        java_max_gb=config["resources"]["java_max_gb"],
+        memory_min_gb=config["resources"]["memory_min_gb"],
+        memory_max_gb=config["resources"]["memory_max_gb"],
     log:
         "logs/{run}/{sample}/FixMateInformation.log",
     shell:
@@ -77,7 +78,7 @@ rule fix_mate_info:
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
         {params.gatk_image}:{params.gatk_ver} gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         FixMateInformation \
         -I {input} \
         -O {output} \
@@ -99,8 +100,8 @@ rule mark_duplicates:
         gatk_ver=config["tools"]["gatk"]["version"],
         tmp_dir="tmp",
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
+        memory_max_gb=config["resources"]["memory_max_gb"],
+        memory_min_gb=config["resources"]["memory_min_gb"],
     log:
         "logs/{run}/{sample}/MarkDuplicates.log",
     shell:
@@ -109,7 +110,7 @@ rule mark_duplicates:
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
         {params.gatk_image}:{params.gatk_ver} gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         MarkDuplicates \
         -I {input} \
         -O {output.bam} \
@@ -135,8 +136,8 @@ rule create_base_recalibration:
             f"--known-sites {site}" for site in config["paths"]["refs"]["known_sites"]
         ),
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
+        memory_max_gb=config["resources"]["memory_max_gb"],
+        memory_min_gb=config["resources"]["memory_min_gb"],
     log:
         "logs/{run}/{sample}/BaseRecalibrator.log",
     shell:
@@ -146,7 +147,7 @@ rule create_base_recalibration:
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
         {params.gatk_image}:{params.gatk_ver} gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         BaseRecalibrator \
         -I {input.bam} \
         -O {output.recal_data} \
@@ -171,8 +172,8 @@ rule apply_base_recalibration:
         tmp_dir="tmp",
         ref_path=config["paths"]["refs"]["path"],
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
+        memory_max_gb=config["resources"]["memory_max_gb"],
+        memory_min_gb=config["resources"]["memory_min_gb"],
     log:
         "logs/{run}/{sample}/ApplyBQSR.log",
     shell:
@@ -182,7 +183,7 @@ rule apply_base_recalibration:
         -v $PWD:$PWD -w $PWD \
         --user $(id -u):$(id -g) \
         {params.gatk_image}:{params.gatk_ver} gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         ApplyBQSR \
         -R {input.refg} \
         -I {input.bam} \
