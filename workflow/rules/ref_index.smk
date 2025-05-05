@@ -5,6 +5,8 @@ rule index_bed:
         bed="refs/regions/regions.bed",
         gz="refs/regions/regions.bed.gz",
         tbi="refs/regions/regions.bed.gz.tbi",
+    conda:
+        "../envs/samtools.yaml"
     shell:
         r"""
         grep -v '^browser\|^track' {input.bed} > {output.bed}
@@ -18,6 +20,8 @@ rule get_chromosomes:
         bed="refs/regions/regions.bed",
     output:
         chrom="refs/chrom.txt",
+    conda:
+        "../envs/samtools.yaml"
     shell:
         """
         cut -f1 {input.bed} | uniq | sort -k1,1V -k2,2n > {output.chrom}

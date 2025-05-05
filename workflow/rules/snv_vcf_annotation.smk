@@ -41,7 +41,7 @@ rule somaticseq_filter:
     output:
         vcf_final="results/{run}/{sample}/{sample}.snv_indels.vcf",
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bcftools view -f PASS {input.vcf} | bcftools sort -Ov -o {output.vcf_final}

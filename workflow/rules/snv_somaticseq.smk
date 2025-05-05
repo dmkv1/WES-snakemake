@@ -87,7 +87,7 @@ rule somaticseq_add_contigs:
         snv_vcf=temp("vcf/{run}/{sample}/somaticseq/Consensus.sSNV.contigs.vcf"),
         indel_vcf=temp("vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf"),
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bcftools reheader --header <(cat <(grep "^##" {input.snv_vcf} | grep -v "^#CHROM") {input.contigs} <(grep "^#CHROM" {input.snv_vcf})) {input.snv_vcf} > {output.snv_vcf}
@@ -109,7 +109,7 @@ rule somaticseq_compress:
             "vcf/{run}/{sample}/somaticseq/Consensus.sINDEL.contigs.vcf.gz.tbi"
         ),
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bcftools sort -Ov {input.snv_vcf} | bgzip > {output.snv_vcf_gz}
@@ -128,7 +128,7 @@ rule somaticseq_concat:
     output:
         merged="vcf/{run}/{sample}/somaticseq/{sample}.consensus.merged.vcf",
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bcftools concat {input.snv_vcf_gz} {input.indel_vcf_gz} -a -Ov -o {output.merged}

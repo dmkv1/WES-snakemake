@@ -4,7 +4,7 @@ rule export_bed:
     output:
         bed=temp("vcf/{run}/{sample}/depth/{sample}.snv_indels.bed"),
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bcftools query -f'%CHROM\t%POS\n' {input.vcf} > {output.bed}
@@ -19,7 +19,7 @@ rule calculate_depth:
     output:
         depth_table="vcf/{run}/{sample}/depth/{sample}.depth.tsv",
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/samtools.yaml"
     shell:
         """
         samtools depth -b {input.bed} {input.normal_bam} {input.tumor_bam} > {output.depth_table}
@@ -36,7 +36,7 @@ rule add_depth_to_vcf:
         dp_header=temp("tmp/{run}_{sample}.dp_header.txt"),
         vcf="vcf/{run}/{sample}/somaticseq/{sample}.consensus.merged.dp.vcf",
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bgzip -c {input.depth_table} > {output.depth_table_gz}

@@ -15,6 +15,8 @@ rule bwa_map:
         ),
     output:
         temp("bam/{run}/{sample}.raw.bam"),
+    conda:
+        "../envs/bwamem.yaml"
     threads: config["resources"]["threads"]
     log:
         "logs/{run}/{sample}/bwamem.log",

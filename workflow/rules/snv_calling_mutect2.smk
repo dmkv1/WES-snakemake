@@ -91,7 +91,7 @@ rule sort_mutect2_calls:
         vcf_gz=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf.gz"),
         vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.sorted.vcf",
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bgzip -c {input.vcf} > {output.vcf_gz}

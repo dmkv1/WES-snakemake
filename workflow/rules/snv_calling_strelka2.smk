@@ -107,7 +107,7 @@ rule sort_strelka_calls:
     output:
         vcf="vcf/{run}/{sample}/strelka/vcf_sorted/{sample}.strelka.sorted.vcf",
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bcftools view -R {input.bed} {input.vcf_gz} | bcftools sort -Ov -o {output.vcf}

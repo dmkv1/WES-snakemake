@@ -91,7 +91,7 @@ rule sort_varscan_calls:
         vcf_gz=temp("vcf/{run}/{sample}/varscan/{sample}.varscan.filtered.vcf.gz"),
         vcf="vcf/{run}/{sample}/varscan/{sample}.varscan.sorted.vcf",
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bgzip -c {input.vcf} > {output.vcf_gz}
