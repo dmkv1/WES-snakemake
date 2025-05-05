@@ -1,9 +1,3 @@
-# def get_tumor_inputs(wildcards):
-#     """Generate -I flags for tumor samples"""
-#     tumors = runs_dict[wildcards.run]["tumors"]
-#     return [f"-I bam/{wildcards.run}/{sample}.bam" for sample in tumors]
-
-
 def get_normal_sample(wildcards):
     """Get normal sample name for a given run"""
     return runs_dict[wildcards.run]["normal"]
@@ -13,10 +7,6 @@ rule run_mutect2:
     input:
         normal=lambda w: f"bam/{w.run}/{runs_dict[w.run]['normal']}.bam",
         tumor=lambda w: f"bam/{w.run}/{w.sample}.bam",
-        # Multisample mode - incompartible with the rest of the callers
-        #tumors=lambda w: expand(
-        #    "bam/{run}/{sample}.bam", run=w.run, sample=runs_dict[w.run]["tumors"]
-        #),
         refg=config["paths"]["refs"]["genome_human"],
         regions="refs/regions/regions.bed",
     output:
@@ -27,8 +17,6 @@ rule run_mutect2:
         gatk_image=config["tools"]["gatk"]["image"],
         gatk_ver=config["tools"]["gatk"]["version"],
         normal_name=get_normal_sample,
-        # Multisample mode - incompartible with the rest of the callers
-        # tumor_inputs=get_tumor_inputs,
         germline=config["paths"]["refs"]["germline_resource"],
         ref_path=config["paths"]["refs"]["path"],
     threads: config["resources"]["threads"]
