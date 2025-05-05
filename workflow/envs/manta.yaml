@@ -4,6 +4,5 @@ channels:
   - bioconda
   - defaults
 dependencies:
+  - python=2.7
   - manta=1.6.0
-  - samtools=1.19
-  - bcftools=1.19
