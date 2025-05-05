@@ -1,4 +1,6 @@
 # Getter functions
+import os
+
 def get_fastq1(wildcards):
     run = wildcards.run
     return fastq_dict[run][wildcards.sample]["fq1"]
@@ -46,3 +48,8 @@ def parse_fastq_header(fastq_path: str, sample_name: str) -> Dict[str, str]:
 def get_read_group_params(wildcards) -> Dict[str, str]:
     fq1_path = fastq_dict[wildcards.run][wildcards.sample]["fq1"]
     return parse_fastq_header(fq1_path, wildcards.sample)
+
+
+def get_ref_path(file_path, use_container=False):
+    base = config["refs"]["container_path"] if use_container else config["refs"]["local_path"]
+    return os.path.join(base, file_path)

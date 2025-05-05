@@ -1,23 +1,30 @@
-paths:
-  input_table: "samples.xlsx"
-  refs:
-    # Path to the reference folder for container mounting
-    path: "/reference/"
-    # Absolute paths to reference files
-    ## Genomes
-    genome_human: "broad/Homo_sapiens_assembly38.fasta"
-    genome_host: "mm39/mm39.fa"
-    ## Exome regions
-    regions_bedfile: "SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
-    ## BQSR
-    known_sites:
-      - "broad/Homo_sapiens_assembly38.dbsnp138.vcf"
-      - "broad/Homo_sapiens_assembly38.known_indels.vcf.gz"
-      - "broad/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
-    ## Mutect2 
-    germline_resource: "gatk-BP-somatic-hg38/af-only-gnomad.hg38.vcf.gz"
-    ## Funcotator
-    funcotator_data_sources: "funcotator/funcotator_dataSources.v1.8.hg38.20230908s"
+input_table: "samples.xlsx"
+
+## Samples with no CTRL would be assigned this value for the CTRL sample name placeholder
+## Please don't use it as an actual sample name.
+default_normal: "PON_CTRL"
+
+refs:
+  # Path to the reference folder in the containers
+  local_path: "/mnt/data/NGS/refs"
+  container_path: "/reference"
+  # Paths relative to the folder above:
+  ## Genomes
+  genome_human: "broad/Homo_sapiens_assembly38.fasta"
+  genome_host: "mm39/mm39.fa"
+  ## Exome regions
+  regions_bedfile: "SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
+  ## BQSR
+  known_sites:
+    - "broad/Homo_sapiens_assembly38.dbsnp138.vcf"
+    - "broad/Homo_sapiens_assembly38.known_indels.vcf.gz"
+    - "broad/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
+  ## Mutect2 
+  germline_resource: "gatk-BP-somatic-hg38/af-only-gnomad.hg38.vcf.gz"
+  ## Funcotator
+  funcotator_data_sources: "funcotator/funcotator_dataSources.v1.8.hg38.20230908s"
+  ## Panel of Normals (PON) - used for the samples without CTRL
+  panel_of_normals: "gatk-BP-somatic-hg38/1000g_pon.hg38.vcf.gz"
 
 resources:
   threads: 16

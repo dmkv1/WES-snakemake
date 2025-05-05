@@ -17,7 +17,7 @@ rule run_mutect2:
         #tumors=lambda w: expand(
         #    "bam/{run}/{sample}.bam", run=w.run, sample=runs_dict[w.run]["tumors"]
         #),
-        refg=config["paths"]["refs"]["genome_human"],
+        refg=config["refs"]["genome_human"],
         regions="refs/regions/regions.bed",
     output:
         vcf=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf"),
@@ -29,8 +29,9 @@ rule run_mutect2:
         normal_name=get_normal_sample,
         # Multisample mode - incompartible with the rest of the callers
         # tumor_inputs=get_tumor_inputs,
-        germline=config["paths"]["refs"]["germline_resource"],
-        ref_path=config["paths"]["refs"]["path"],
+        germline=config["refs"]["germline_resource"],
+        refdir=config["refs"]["path"],
+        pon=config["refs"]["panel_of_normals"],
     threads: config["resources"]["threads"]
     resources:
         memory_max_gb=config["resources"]["memory_max_gb"],
@@ -45,12 +46,13 @@ rule run_mutect2:
         --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         Mutect2 \
         --native-pair-hmm-threads {threads} \
-        -R {input.refg} \
+        -R {params.refdir}/{input.refg} \
         --germline-resource {params.germline} \
         --intervals {input.regions} \
-        -I {input.normal} \
         -I {input.tumor} \
-        -normal {params.normal_name} \
+        {'' if params.normal_name == params.default_normal else '-I ' + input.normal} \
+        -normal {'null' if params.normal_name == params.default_normal else params.normal_name} \
+        {'-pon ' + params.refdir + '/' + params.pon if params.normal_name == params.default_normal else ''} \
         -O {output.vcf} \
         > {log} 2>&1
         """
@@ -61,15 +63,13 @@ rule filter_mutect2_calls:
         vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf",
         idx="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.idx",
         stats="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.stats",
-        refg=config["paths"]["refs"]["genome_human"],
+        refg=config["refs"]["genome_human"],
     output:
         vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf",
         idx="vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf.idx",
         filtering_stats="metrics/{run}/{sample}/{sample}.mutect2.filtered.filteringStats.tsv",
     params:
-        gatk_image=config["tools"]["gatk"]["image"],
-        gatk_ver=config["tools"]["gatk"]["version"],
-        ref_path=config["paths"]["refs"]["path"],
+        refdir=config["refs"]["path"],
     resources:
         memory_max_gb=config["resources"]["memory_max_gb"],
         memory_min_gb=config["resources"]["memory_min_gb"],
@@ -84,7 +84,7 @@ rule filter_mutect2_calls:
         {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         FilterMutectCalls \
-        -R {input.refg} \
+        -R {params.refdir}/{input.refg} \
         -V {input.vcf} \
         -O {output.vcf} \
         --stats {input.stats} \
@@ -101,7 +101,7 @@ rule sort_mutect2_calls:
         vcf_gz=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf.gz"),
         vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.sorted.vcf",
     conda:
-        "../envs/sam_vcf_tools.yaml"
+        "../envs/bcftools.yaml"
     shell:
         """
         bgzip -c {input.vcf} > {output.vcf_gz}

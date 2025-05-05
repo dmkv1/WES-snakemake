@@ -1,7 +1,7 @@
 name: varscan
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
   - defaults
 dependencies:
   - varscan=2.4.6

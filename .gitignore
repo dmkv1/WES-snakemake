@@ -2,6 +2,7 @@
 .snakemake/
 results/
 logs/
+reference/
 snakemake.pid
 
 # Python

@@ -2,16 +2,18 @@ rule samtools_mpileup:
     input:
         normal=lambda w: f"bam/{w.run}/{runs_dict[w.run]['normal']}.bam",
         tumor=lambda w: f"bam/{w.run}/{w.sample}.bam",
-        refg=config["paths"]["refs"]["genome_human"],
+        
     output:
         mpileup="mpileup/{run}/{sample}.mpileup",
+    params:
+        refg=config["refs"]["genome_human"],
     conda:
         "../envs/varscan.yaml"
     threads: config["resources"]["threads"]
     shell:
         """
         samtools mpileup \
-        -f {input.refg} \
+        -f {params.refg} \
         -q 1 \
         -B \
         {input.normal} {input.tumor} > {output.mpileup}

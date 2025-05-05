@@ -1,7 +1,7 @@
-name: xengsort
+name: sam_vcf_tools
 channels:
   - conda-forge
   - bioconda
   - defaults
 dependencies:
-  - xengsort=2.0.8
+  - bcftools=1.21

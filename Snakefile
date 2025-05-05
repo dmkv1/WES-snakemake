@@ -4,7 +4,7 @@ import pandas as pd
 configfile: "config.yaml"
 
 
-samples = pd.read_excel(config["paths"]["input_table"])
+samples = pd.read_excel(config["input_table"])
 
 # Create a dictionary of runs and their samples
 runs_dict = {}

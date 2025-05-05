@@ -1,7 +1,5 @@
 rule bwa_map:
     input:
-        refdir=config["paths"]["refs"]["path"],
-        refg=config["paths"]["refs"]["genome_human"],
         fq1=lambda wildcards: (
             f"fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}.xengsort-graft.1.fq.gz"
             if wildcards.run in pdx_dict
@@ -16,11 +14,15 @@ rule bwa_map:
         ),
     output:
         temp("bam/{run}/{sample}.raw.bam"),
+    params:
+        refg=get_ref_path(config["refs"]["genome_human"], use_container=False),
+    conda:
+        "../envs/bwamem.yaml"
     threads: config["resources"]["threads"]
     log:
         "logs/{run}/{sample}/bwamem.log",
     shell:
-        "(bwa mem -M -t {threads} {input.refg} {input.fq1} {input.fq2} | samtools view -Sb - > {output}) 2> {log}"
+        "(bwa mem -M -t {threads} {params.refg} {input.fq1} {input.fq2} | samtools view -Sb - > {output}) 2> {log}"
 
 
 rule add_read_groups:
@@ -124,16 +126,16 @@ rule mark_duplicates:
 rule create_base_recalibration:
     input:
         bam="bam/{run}/{sample}.md.bam",
-        refg=config["paths"]["refs"]["genome_human"],
     output:
         recal_data="metrics/{run}/{sample}/{sample}.recal_data.table",
     params:
         gatk_image=config["tools"]["gatk"]["image"],
         gatk_ver=config["tools"]["gatk"]["version"],
         tmp_dir="tmp",
-        ref_path=config["paths"]["refs"]["path"],
+        refg=get_ref_path(config["refs"]["genome_human"], use_container=True),
         known_sites=lambda _: " ".join(
-            f"--known-sites {site}" for site in config["paths"]["refs"]["known_sites"]
+            f"--known-sites {get_ref_path(site, use_container= True)}"
+            for site in config["refs"]["known_sites"]
         ),
     resources:
         memory_max_gb=config["resources"]["memory_max_gb"],
@@ -151,7 +153,7 @@ rule create_base_recalibration:
         BaseRecalibrator \
         -I {input.bam} \
         -O {output.recal_data} \
-        -R {input.refg} \
+        -R {params.refg} \
         {params.known_sites} \
         --tmp-dir {params.tmp_dir} \
         > {log} 2>&1
@@ -160,17 +162,14 @@ rule create_base_recalibration:
 
 rule apply_base_recalibration:
     input:
-        refg=config["paths"]["refs"]["genome_human"],
         bam="bam/{run}/{sample}.md.bam",
         bsqr_recal="metrics/{run}/{sample}/{sample}.recal_data.table",
     output:
         bam="bam/{run}/{sample}.bam",
         bai="bam/{run}/{sample}.bai",
     params:
-        gatk_image=config["tools"]["gatk"]["image"],
-        gatk_ver=config["tools"]["gatk"]["version"],
+        refg=get_ref_path(config["refs"]["genome_human"], use_container=True),
         tmp_dir="tmp",
-        ref_path=config["paths"]["refs"]["path"],
     resources:
         memory_max_gb=config["resources"]["memory_max_gb"],
         memory_min_gb=config["resources"]["memory_min_gb"],
@@ -185,7 +184,7 @@ rule apply_base_recalibration:
         {params.gatk_image}:{params.gatk_ver} gatk \
         --java-options "-Xms{resources.memory_min_gb}G -Xmx{resources.memory_max_gb}G" \
         ApplyBQSR \
-        -R {input.refg} \
+        -R {params.refg} \
         -I {input.bam} \
         --bqsr-recal-file {input.bsqr_recal} \
         -O {output.bam} \
