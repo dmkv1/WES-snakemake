@@ -6,15 +6,16 @@ rule samtools_mpileup:
     output:
         mpileup="mpileup/{run}/{sample}.mpileup",
     conda:
-        "../envs/varscan.yaml"
-    threads: config["resources"]["threads"]
+        "../envs/samtools.yaml"
+    log:
+        "logs/{run}/{sample}/samtools_mpileup.log",
     shell:
         """
         samtools mpileup \
         -f {input.refg} \
         -q 1 \
         -B \
-        {input.normal} {input.tumor} > {output.mpileup}
+        {input.normal} {input.tumor} > {output.mpileup} 2> {log}
         """
 
 
