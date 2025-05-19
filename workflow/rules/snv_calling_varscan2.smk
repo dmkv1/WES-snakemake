@@ -4,17 +4,22 @@ rule samtools_mpileup:
         tumor=lambda w: f"bam/{w.run}/{w.sample}.bam",
         refg=config["paths"]["refs"]["genome_human"],
     output:
-        mpileup="mpileup/{run}/{sample}.mpileup",
+        mpileup=temp("mpileup/{run}/{sample}.mpileup"),
     conda:
         "../envs/varscan.yaml"
     threads: config["resources"]["threads"]
+    log:
+        "logs/{run}/{sample}/mpileup.log",
     shell:
         """
         samtools mpileup \
         -f {input.refg} \
         -q 1 \
         -B \
-        {input.normal} {input.tumor} > {output.mpileup}
+        -o {output.mpileup} \
+        --verbosity 4 \
+        {input.normal} {input.tumor} \
+        > {log} 2>&1
         """
 
 
