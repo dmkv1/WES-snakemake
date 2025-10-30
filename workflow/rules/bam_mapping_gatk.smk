@@ -6,6 +6,7 @@ rule fastp_trim:
         fq1=temp("work/fastq/{run}/{sample}/{sample}.trimmed.1.fq.gz"),
         fq2=temp("work/fastq/{run}/{sample}/{sample}.trimmed.2.fq.gz"),
         html="results/qc/fastp/{run}/{sample}_fastp.html",
+        zip="results/qc/fastp/{run}/{sample}_fastp.zip",
         json="results/qc/fastp/{run}/{sample}_fastp.json",
     threads: 4
     conda:
@@ -208,6 +209,7 @@ rule mosdepth:
         ]["regions_bedfile"],
     output:
         summary="results/metrics/{run}_{sample}.mosdepth.summary.txt",
+        region_dist="results/metrics/{run}_{sample}.mosdepth.region.dist.txt",
         thresholds="results/metrics/{run}_{sample}.thresholds.bed.gz",
     params:
         prefix="results/metrics/{run}_{sample}",
