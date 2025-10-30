@@ -1,7 +1,6 @@
-name: sam_vcf_tools
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
-  - samtools=1.21
+  - annotsv=3.5.3
+  - bcftools=1.21

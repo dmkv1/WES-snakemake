@@ -5,33 +5,29 @@ def get_normal_sample(wildcards):
 
 rule run_mutect2:
     input:
-        normal=lambda w: f"bam/{w.run}/{runs_dict[w.run]['normal']}.bam",
-        tumor=lambda w: f"bam/{w.run}/{w.sample}.bam",
-        refg=config["paths"]["refs"]["genome_human"],
-        regions="refs/regions/regions.bed",
+        normal=lambda w: f"results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam",
+        tumor=lambda w: f"results/{w.run}/{w.sample}/bam/{w.sample}.bam",
+        refg=config["refs"]["genome_human"],
+        regions=lambda w: f"work/refs/regions/{get_probe_version(w)}/regions.bed",
     output:
-        vcf=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf"),
-        idx=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.idx"),
-        stats="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.stats",
+        vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf",
+        idx="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.idx",
+        stats="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.stats",
     params:
-        gatk_image=config["tools"]["gatk"]["image"],
-        gatk_ver=config["tools"]["gatk"]["version"],
         normal_name=get_normal_sample,
-        germline=config["paths"]["refs"]["germline_resource"],
-        ref_path=config["paths"]["refs"]["path"],
+        germline=config["refs"]["germline_resource"],
+        ref_path=config["refs"]["path"],
     threads: config["resources"]["threads"]
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
     log:
-        "logs/{run}/{sample}/Mutect2.log",
+        "work/logs/Mutect2_{run}_{sample}.log",
+    container:
+        "docker://broadinstitute/gatk:4.6.1.0"
     shell:
         """
-        docker run --rm \
-        -v {params.ref_path}:{params.ref_path} \
-        -v $PWD:$PWD -w $PWD \
-        --user $(id -u):$(id -g) \
-        {params.gatk_image}:{params.gatk_ver} gatk \
+        gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         Mutect2 \
         --native-pair-hmm-threads {threads} \
@@ -48,30 +44,26 @@ rule run_mutect2:
 
 rule filter_mutect2_calls:
     input:
-        vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf",
-        idx="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.idx",
-        stats="vcf/{run}/{sample}/mutect/{sample}.mutect2.unfiltered.vcf.stats",
-        refg=config["paths"]["refs"]["genome_human"],
+        vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf",
+        idx="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.idx",
+        stats="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.stats",
+        refg=config["refs"]["genome_human"],
     output:
-        vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf",
-        idx="vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf.idx",
-        filtering_stats="metrics/{run}/{sample}/{sample}.mutect2.filtered.filteringStats.tsv",
+        vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.filtered.vcf",
+        idx="work/mutect2/{run}/{sample}/{sample}.mutect2.filtered.vcf.idx",
+        filtering_stats="results/metrics/mutect2_filteringStats_{run}_{sample}.tsv",
     params:
-        gatk_image=config["tools"]["gatk"]["image"],
-        gatk_ver=config["tools"]["gatk"]["version"],
-        ref_path=config["paths"]["refs"]["path"],
+        ref_path=config["refs"]["path"],
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
     log:
-        "logs/{run}/{sample}/FilterMutectCalls.log",
+        "work/logs/FilterMutectCalls_{run}_{sample}.log",
+    container:
+        "docker://broadinstitute/gatk:4.6.1.0"
     shell:
         """
-        docker run --rm \
-        -v {params.ref_path}:{params.ref_path} \
-        -v $PWD:$PWD -w $PWD \
-        --user $(id -u):$(id -g) \
-        {params.gatk_image}:{params.gatk_ver} gatk \
+        gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         FilterMutectCalls \
         -R {input.refg} \
@@ -83,18 +75,48 @@ rule filter_mutect2_calls:
         """
 
 
-rule sort_mutect2_calls:
+rule filter_and_sort_mutect2_calls:
     input:
-        vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf",
-        bed="refs/regions/regions.bed.gz",
+        vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.filtered.vcf",
+        regions=lambda w: f"work/refs/regions/{get_probe_version(w)}/regions.bed.gz",
     output:
-        vcf_gz=temp("vcf/{run}/{sample}/mutect/{sample}.mutect2.filtered.vcf.gz"),
-        vcf="vcf/{run}/{sample}/mutect/{sample}.mutect2.sorted.vcf",
+        vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.final.vcf",
     conda:
         "../envs/bcftools.yaml"
     shell:
         """
-        bgzip -c {input.vcf} > {output.vcf_gz}
-        tabix -p vcf {output.vcf_gz}
-        bcftools view -R {input.bed} {output.vcf_gz} | bcftools sort -Ov -o {output.vcf}
+        bcftools view -f PASS {input.vcf} | bcftools sort -Ov -o {output.vcf}
+        """
+
+
+rule funcotator:
+    input:
+        vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.final.vcf",
+        refg=config["refs"]["genome_human"],
+    output:
+        vcf="results/{run}/{sample}/{sample}.SNV.vcf",
+        idx="results/{run}/{sample}/{sample}.SNV.vcf.idx",
+    params:
+        genome_ver=config["refs"]["funcotator_data_sources"]["genome_version"],
+        data_sources=config["refs"]["funcotator_data_sources"]["path"],
+        ref_path=config["refs"]["path"],
+    resources:
+        java_max_gb=config["resources"]["java_max_gb"],
+        java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "work/logs/Funcotator_{run}_{sample}.log",
+    container:
+        "docker://broadinstitute/gatk:4.6.1.0"
+    shell:
+        """
+        gatk \
+        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        Funcotator \
+        --reference {input.refg} \
+        --ref-version {params.genome_ver} \
+        --data-sources-path {params.data_sources} \
+        --output-file-format VCF \
+        --variant {input.vcf} \
+        --output {output.vcf} \
+        > {log} 2>&1
         """

@@ -1,0 +1,5 @@
+rerun-incomplete: true
+use-conda: true
+use-singularity: true
+singularity-args: "-B /mnt/data/NGS/refs:/mnt/data/NGS/refs"
+cores: 32

@@ -1,66 +1,58 @@
-paths:
-  input_table: "samples.xlsx"
-  refs:
-    # Path to the reference folder for container mounting
-    path: "/mnt/data/NGS/refs"
-    # Absolute paths to reference files
-    ## Genomes
-    genome_human: "/mnt/data/NGS/refs/broad/Homo_sapiens_assembly38.fasta"
-    genome_host: "/mnt/data/NGS/refs/mm39/mm39.fa"
-    ## Exome regions
+samplesheet: "P005_full.csv"
+
+probe_configs:
+  "V6+UTR":
+    library_prep: "SureSelectV6UTR"
+    regions_bedfile: "/mnt/data/NGS/refs/SureSelectHumanAllExon/V6UTR/S07604624_Regions.bed"
+    cnvkit_targets:     "/mnt/data/NGS/refs/CNVkit/CNVkit-nf/reference_V6/targets.bed"
+    cnvkit_antitargets: "/mnt/data/NGS/refs/CNVkit/CNVkit-nf/reference_V6/antitargets.bed"
+    cnvkit_ref_m:       "/mnt/data/NGS/refs/CNVkit/CNVkit-nf/reference_V6/reference_male.cnn"
+    cnvkit_ref_f:       "/mnt/data/NGS/refs/CNVkit/CNVkit-nf/reference_V6/reference_female.cnn"
+  "V8+UTR":
+    library_prep: "SureSelectV8UTR"
     regions_bedfile: "/mnt/data/NGS/refs/SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
-    ## BQSR
-    known_sites:
-      - "/mnt/data/NGS/refs/broad/Homo_sapiens_assembly38.dbsnp138.vcf"
-      - "/mnt/data/NGS/refs/broad/Homo_sapiens_assembly38.known_indels.vcf.gz"
-      - "/mnt/data/NGS/refs/broad/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
-    ## Mutect2 
-    germline_resource: "/mnt/data/NGS/refs/gatk-BP-somatic-hg38/af-only-gnomad.hg38.vcf.gz"
-    ## Funcotator
-    funcotator_data_sources: "/mnt/data/NGS/refs/funcotator/funcotator_dataSources.v1.8.hg38.20230908s"
+    cnvkit_targets:     "/mnt/data/NGS/refs/CNVkit/CNVkit-nf/reference_V8/targets.bed"
+    cnvkit_antitargets: "/mnt/data/NGS/refs/CNVkit/CNVkit-nf/reference_V8/antitargets.bed"
+    cnvkit_ref_m: "/mnt/data/NGS/refs/CNVkit/CNVkit-nf/reference_V8/reference_male.cnn"
+    cnvkit_ref_f: "/mnt/data/NGS/refs/CNVkit/CNVkit-nf/reference_V8/reference_female.cnn"
 
-resources:
-  threads: 32
-  java_max_gb: 256
-  java_min_gb: 32
-  strelka_max_gb: 256
-
-tools:
-  gatk:
-    image: "broadinstitute/gatk"
-    version: "4.6.1.0"
-  strelka:
-    image: "mcfonsecalab/strelka"
-    version: "2.9.10"
-  somaticseq:
-    image: "lethalfang/somaticseq"
-    version: "latest"
+refs:
+  # Absolute paths to reference directory:
+  path: "/mnt/data/NGS/refs"
+  # Absolute paths to reference files:
+  ## Genomes
+  genome_human: "/mnt/data/NGS/refs/broad/Homo_sapiens_assembly38.fasta"
+  genome_host: "/mnt/data/NGS/refs/mm39/mm39.fa"
+  ## BQSR
+  known_sites:
+    - "/mnt/data/NGS/refs/broad/Homo_sapiens_assembly38.dbsnp138.vcf"
+    - "/mnt/data/NGS/refs/broad/Homo_sapiens_assembly38.known_indels.vcf.gz"
+    - "/mnt/data/NGS/refs/broad/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
+  ## Mutect2 
+  germline_resource: "/mnt/data/NGS/refs/gatk-BP-somatic-hg38/af-only-gnomad.hg38.vcf.gz"
+  ## Funcotator
+  funcotator_data_sources: 
+    genome_version: "hg38"
+    path: "/mnt/data/NGS/refs/funcotator/funcotator_dataSources.v1.8.hg38.20230908s"
+  ## Predownloaded AnnotSV cache
+  annotsv_annotations:
+    genome_build: "GRCh38"
+    path: "/mnt/data/NGS/refs/annotsv/AnnotSV_annotations"
+  purecn:
+    genome: "hg38"
 
 params:
-    library_prep: "SureSelectV8UTR"
-    genome_version: "hg38" # need to be specified for Funcotator
     xengsort:
       index_size: 4500000000
       index_fill: 0.88
       index_k: 25
       chunksize: 16.0
       prefetch: 1
-    varscan:
-      min_coverage: 5 # Minimum coverage in normal and tumor to call variant
-      min_var_freq: 0.05 # Minimum variant frequency to call a heterozygote
-      p_value: 0.99 # P-value threshold to call a heterozygote
-      somatic_p_value: 0.01 # P-value threshold to call a somatic site
-      filter_min_coverage: 5
-      filter_p_value: 0.01 # Default p-value threshold for calling variants [1e-01]
-      filter_min_reads: 2 # Minimum supporting reads for a variant [2]
-      filter_min_strands: 1 # Minimum # of strands on which variant observed (1 or 2) [1]
-      filter_min_avg_qual: 20 # Minimum average base quality for variant-supporting reads [20]
-      filter_min_var_freq: 0.05 # Minimum variant allele frequency threshold [0.20]
-    somaticseq:
-      pass_threshold: 0.5 # SCORE for PASS (default: 0.5)
-      lowqual_threshold: 0.1 # SCORE for LowQual (default: 0.1)
-      homozygous_threshold: 0.85 # VAF for homozygous (default: 0.85)
-      heterozygous_threshold: 0.01 # VAF for heterozygous (default: 0.01)
-      minimum_mapping_quality: 1 # Minimum mapping quality below which is considered poor (default: 1)
-      minimum_base_quality: 5 # Minimum base quality below which is considered poor (default: 5)
-      minimum_num_callers: 1 # Minimum number of tools to be considered (default: 0.5)
+    cnvkit:
+      filter_ci: true  # Set to true to enable segments filtering based on CI
+
+resources:
+  threads: 32
+  java_max_gb: 256
+  java_min_gb: 32
+  manta_max_gb: 256

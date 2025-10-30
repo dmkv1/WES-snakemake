@@ -1,12 +1,12 @@
 rule build_xengsort_index:
     input:
-        refg_human=config["paths"]["refs"]["genome_human"],
-        refg_host=config["paths"]["refs"]["genome_host"],
+        refg_human=config["refs"]["genome_human"],
+        refg_host=config["refs"]["genome_host"],
     output:
-        info="refs/xengsort/xengsort-index.info",
-        hash="refs/xengsort/xengsort-index.hash",
+        info="work/refs/xengsort/xengsort-index.info",
+        hash="work/refs/xengsort/xengsort-index.hash",
     params:
-        index="refs/xengsort/xengsort-index",
+        index="work/refs/xengsort/xengsort-index",
         size=config["params"]["xengsort"]["index_size"],
         fill=config["params"]["xengsort"]["index_fill"],
         k=config["params"]["xengsort"]["index_k"],
@@ -14,7 +14,7 @@ rule build_xengsort_index:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
     log:
-        "logs/xengsort/xengsort-index.log",
+        "work/logs/xengsort-index.log",
     shell:
         """
         xengsort index --index {params.index} \
@@ -27,23 +27,23 @@ rule build_xengsort_index:
 
 rule run_xengsort:
     input:
-        index_info="refs/xengsort/xengsort-index.info",
-        index_hash="refs/xengsort/xengsort-index.hash",
-        fq1=get_fastq1,
-        fq2=get_fastq2,
+        index_info="work/refs/xengsort/xengsort-index.info",
+        index_hash="work/refs/xengsort/xengsort-index.hash",
+        fq1="work/fastq/{run}/{sample}/{sample}.trimmed.1.fq.gz",
+        fq2="work/fastq/{run}/{sample}/{sample}.trimmed.2.fq.gz",
     output:
-        graft1=temp("fastq/{run}/{sample}/{sample}.xengsort-graft.1.fq.gz"),
-        graft2=temp("fastq/{run}/{sample}/{sample}.xengsort-graft.2.fq.gz"),
+        graft1=temp("work/fastq/{run}/{sample}/{sample}.xengsort-graft.1.fq.gz"),
+        graft2=temp("work/fastq/{run}/{sample}/{sample}.xengsort-graft.2.fq.gz"),
     params:
-        index="refs/xengsort/xengsort-index",
-        outprefix="fastq/{run}/{sample}/{sample}.xengsort",
+        index="work/refs/xengsort/xengsort-index",
+        outprefix="work/fastq/{run}/{sample}/{sample}.xengsort",
         chunksize=config["params"]["xengsort"]["chunksize"],
         prefetch=config["params"]["xengsort"]["prefetch"],
     conda:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
     log:
-        "logs/{run}/{sample}/xengsort.log",
+        "work/logs/xengsort_{run}_{sample}.log",
     shell:
         """
         xengsort classify --out {params.outprefix} \

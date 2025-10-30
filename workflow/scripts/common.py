@@ -1,3 +1,7 @@
+import gzip
+from typing import Dict
+
+
 # Getter functions
 def get_fastq1(wildcards):
     run = wildcards.run
@@ -13,8 +17,19 @@ def get_tumor_bams(wildcards):
     return expand("results/bam/{sample}.bam", sample=runs_dict[wildcards.run]["tumors"])
 
 
-import gzip
-from typing import Dict
+def get_library_prep_for_sample(sample_name):
+    for run, samples in probe_dict.items():
+        if sample_name in samples:
+            probe_version = samples[sample_name]
+            return config["probe_configs"][probe_version]["library_prep"]
+    raise ValueError(f"Sample {sample_name} not found in probe_dict")
+
+
+def get_probe_version(wildcards):
+    return probe_dict[wildcards.run][wildcards.sample]
+
+def get_purity(wildcards):
+    return purity_dict[wildcards.run][wildcards.sample]
 
 
 def parse_fastq_header(fastq_path: str, sample_name: str) -> Dict[str, str]:
@@ -39,7 +54,7 @@ def parse_fastq_header(fastq_path: str, sample_name: str) -> Dict[str, str]:
         "RGPU": platform_unit,
         "RGSM": sample_name,
         "RGPL": "ILLUMINA",
-        "RGLB": f"{sample_name}_{config['params']['library_prep']}",
+        "RGLB": f"{sample_name}_{get_library_prep_for_sample(sample_name)}",
     }
 
 

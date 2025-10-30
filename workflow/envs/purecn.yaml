@@ -1,7 +1,6 @@
-name: varscan
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
-  - varscan=2.4.6
+  - bioconductor-purecn=2.12.0
+  - r-optparse

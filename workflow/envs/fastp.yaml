@@ -1,7 +1,5 @@
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
-  - python=2.7
-  - manta=1.6.0
+  - fastp=0.23.4

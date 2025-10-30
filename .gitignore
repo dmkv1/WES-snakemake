@@ -1,5 +1,8 @@
 # Snakemake
 .snakemake/
+.cache/
+.config/
+work/
 results/
 logs/
 snakemake.pid
@@ -9,8 +12,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Logs
+*.log
+
 # Data
-*.xlsx
 refs/
 fastq/
 bam/
@@ -26,9 +31,5 @@ tmp/
 *.bam
 *.vcf
 *.vcf.gz
-*.csv
-*.log
 *.tbi
-
-# Dev
-scratch/
+*.xlsx

@@ -3,5 +3,6 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - python=2.7
-  - manta=1.6.0
+  - mosdepth=0.3.11
+  - fastqc=0.12.1
+  - multiqc=1.31

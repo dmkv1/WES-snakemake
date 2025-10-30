@@ -1,4 +1,3 @@
-name: bwamem
 channels:
   - conda-forge
   - bioconda

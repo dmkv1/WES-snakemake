@@ -1,12 +1,14 @@
 rule index_bed:
     input:
-        bed=config["paths"]["refs"]["regions_bedfile"],
+        bed=lambda wildcards: config["probe_configs"][wildcards.probe_version][
+            "regions_bedfile"
+        ],
     output:
-        bed="refs/regions/regions.bed",
-        gz="refs/regions/regions.bed.gz",
-        tbi="refs/regions/regions.bed.gz.tbi",
+        bed="work/refs/regions/{probe_version}/regions.bed",
+        gz="work/refs/regions/{probe_version}/regions.bed.gz",
+        tbi="work/refs/regions/{probe_version}/regions.bed.gz.tbi",
     conda:
-        "../envs/samtools.yaml"
+        "../envs/bwamem.yaml"
     shell:
         r"""
         grep -v '^browser\|^track' {input.bed} > {output.bed}
@@ -17,11 +19,11 @@ rule index_bed:
 
 rule get_chromosomes:
     input:
-        bed="refs/regions/regions.bed",
+        bed="work/refs/regions/{probe_version}/regions.bed",
     output:
-        chrom="refs/chrom.txt",
+        chrom="work/refs/regions/{probe_version}/chrom.txt",
     conda:
-        "../envs/samtools.yaml"
+        "../envs/bwamem.yaml"
     shell:
         """
         cut -f1 {input.bed} | uniq | sort -k1,1V -k2,2n > {output.chrom}
