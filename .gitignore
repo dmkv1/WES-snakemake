@@ -33,3 +33,5 @@ tmp/
 *.vcf.gz
 *.tbi
 *.xlsx
+*.csv
+TODO
