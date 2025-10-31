@@ -6,7 +6,6 @@ rule fastp_trim:
         fq1=temp("work/fastq/{run}/{sample}/{sample}.trimmed.1.fq.gz"),
         fq2=temp("work/fastq/{run}/{sample}/{sample}.trimmed.2.fq.gz"),
         html="results/qc/fastp/{run}/{sample}_fastp.html",
-        zip="results/qc/fastp/{run}/{sample}_fastp.zip",
         json="results/qc/fastp/{run}/{sample}_fastp.json",
     threads: 4
     conda:
@@ -226,23 +225,24 @@ rule fastqc:
         "results/{run}/{sample}/bam/{sample}.bam",
     output:
         html="results/qc/fastqc/{run}/{sample}_fastqc.html",
-        zip="results/qc/fastqc/{run}/{sample}_fastqc.zip",
+    params:
+        outdir=lambda wildcards, output: os.path.dirname(output.html)
     conda:
         "../envs/qc.yaml"
     threads: 2
     shell:
-        "fastqc {input} -o results/qc/fastqc/{run} -t {threads}"
+        "fastqc {input} -o {params.outdir} -t {threads}"
 
 
 rule multiqc:
     input:
         [
-            f"results/qc/fastqc/{run}/{sample}_fastqc.zip"
+            f"results/qc/fastqc/{run}/{sample}_fastqc.html"
             for run in runs_dict
             for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
         ],
         [
-            f"results/qc/fastp/{run}/{sample}_fastp.zip"
+            f"results/qc/fastp/{run}/{sample}_fastp.html"
             for run in runs_dict
             for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
         ],
