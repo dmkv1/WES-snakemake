@@ -7,6 +7,14 @@ configfile: "config.yaml"
 
 samples = pd.read_csv(config["samplesheet"])
 
+valid_sex_values = {"XX", "XY"}
+invalid_sex = samples[~samples["Chr_sex"].isin(valid_sex_values) & samples["Chr_sex"].notna()]
+if not invalid_sex.empty:
+    invalid_samples = invalid_sex[["ID", "sample", "Chr_sex"]].to_string(index=False)
+    raise ValueError(
+        f"Invalid Chr_sex values found. Must be 'XX' or 'XY':\n{invalid_samples}"
+    )
+
 # Create a dictionary of runs and their samples
 # {'ID': {'normal': 'CTRL', 'tumors': ['PT', 'PDX']}}
 runs_dict = {}

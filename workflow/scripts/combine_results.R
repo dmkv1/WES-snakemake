@@ -59,7 +59,6 @@ sample_sex <- snakemake@params[["sample_sex"]]
 # purity = 1
 # sample_sex = "male"
 
-
 # --- Parse Mutect2 vcf ----
 vcf <- suppressWarnings(VariantAnnotation::readVcf(input_file_vcf, "hg38"))
 vcf <- vcf[rowRanges(vcf)$FILTER == "PASS"]
@@ -145,10 +144,13 @@ result_snv <- as.data.frame(lapply(result, function(col) {
 # --- Parse CNVkit cns ----
 CNVs.df <- read_tsv(input_cns_cnv, show_col_types = FALSE)
 
+# Convert to GRanges to overlap with the variants
 cnv_gr <- GRanges(
   seqnames = CNVs.df$chromosome,
   ranges = IRanges(start = CNVs.df$start, end = CNVs.df$end),
-  cn = CNVs.df$cn
+  cn = CNVs.df$cn,
+  cn1 = CNVs.df$cn1,
+  cn2 = CNVs.df$cn2
 )
 
 var_chr <- word(result_snv$Position, 1, sep = ":")
@@ -161,10 +163,11 @@ var_gr <- GRanges(
 
 # Find overlapping CNV segments for each variant
 overlaps <- findOverlaps(var_gr, cnv_gr, select = "first")
-local_cn <- cnv_gr$cn[overlaps]
+tumor_cn <- cnv_gr$cn[overlaps]
+
 # Handle missing overlaps - default based on chromosome and sex
-local_cn <- ifelse(
-  is.na(local_cn),
+tumor_cn <- ifelse(
+  is.na(tumor_cn),
   ifelse(
     var_chr %in% c("chrX", "X") & sample_sex == "male",
     1,  # X in males
@@ -174,9 +177,10 @@ local_cn <- ifelse(
       2  # Autosomes default to diploid
     )
   ),
-  local_cn
+  tumor_cn
 )
 
+# Calculate CCF
 # Get tumor AF (last column in AF columns, which is the tumor sample)
 af_cols <- grep("^AF_", colnames(result_snv))
 tumor_af <- result_snv[, af_cols[length(af_cols)]]  # Last AF column is tumor
@@ -190,32 +194,51 @@ tumor_gt_normalized <- gsub("\\|", "/", tumor_gt)
 
 expected_mutant_copies <- ifelse(
   tumor_gt_normalized == "1/1",
-  local_cn,  # Homozygous - all copies mutant
+  tumor_cn,  # Homozygous - all copies mutant
   1  # Heterozygous (0/1, 1/0) - 1 copy mutant
 )
 
 # Calculate CCF
-# Formula: CCF = (observed_AF × local_CN) / (purity × expected_mutant_copies)
+# Formula: CCF = (observed_AF × tumor_cn) / (purity × expected_mutant_copies)
 # 
 # Logic: 
 # - observed_AF = (mutant_reads) / (total_reads)
-# - In pure tumor: AF = expected_mutant_copies / local_CN
-# - With purity p: AF = (p × expected_mutant_copies/local_CN + (1-p) × 0)
-#                     = p × expected_mutant_copies / local_CN
+# - In pure tumor: AF = expected_mutant_copies / tumor_cn
+# - With purity p: AF = (p × expected_mutant_copies/tumor_cn + (1-p) × 0)
+#                     = p × expected_mutant_copies / tumor_cn
 # - But if mutation is subclonal (present in fraction f of cancer cells):
-#   AF = p × f × expected_mutant_copies / local_CN
+#   AF = p × f × expected_mutant_copies / tumor_cn
 # - Solving for f (which is CCF):
-#   CCF = AF × local_CN / (p × expected_mutant_copies)
+#   CCF = AF × tumor_cn / (p × expected_mutant_copies)
 # Calculate CCF
-# Formula: CCF = (observed_AF × purity × local_CN) / expected_mutant_copies
+# Formula: CCF = (observed_AF × purity × tumor_cn) / expected_mutant_copies
 
-ccf <- (tumor_af * local_cn) / (purity * expected_mutant_copies)
+ccf <- (tumor_af * tumor_cn) / (purity * expected_mutant_copies)
 ccf <- pmin(ccf, 1.0)  # Cap at 1.0 (100%)
 
 # Add CCF columns to result
-result_snv$local_CN <- local_cn
 result_snv$expected_mutant_copies <- expected_mutant_copies
 result_snv$CCF <- round(ccf, 3)
+
+# Add normal CN
+normal_cn <- ifelse(
+  var_chr %in% c("chrX", "X") & sample_sex == "male", 1,  # X in males
+  ifelse(
+    var_chr %in% c("chrY", "Y"),
+    ifelse(sample_sex == "male", 1, 0),  # Y in males=1, females=0
+    2  # Autosomes default to diploid
+  ))
+result_snv$normal_cn <- normal_cn
+
+# Add tumor CN
+result_snv$tumor_cn <- tumor_cn
+
+# Add major and minor allele CNs
+tumor_cn1 <- cnv_gr$cn1[overlaps]
+result_snv$tumor_cn1 <- tumor_cn1
+
+tumor_cn2 <- cnv_gr$cn2[overlaps]
+result_snv$tumor_cn2 <- tumor_cn2
 
 # Reorder columns
 result_snv <- result_snv %>%
@@ -225,7 +248,10 @@ result_snv <- result_snv %>%
     FILTER,
     contains("AF_"),
     contains("GT_"),
-    local_CN,
+    normal_cn,
+    tumor_cn,
+    tumor_cn1,
+    tumor_cn2,
     expected_mutant_copies,
     CCF,
     everything()
