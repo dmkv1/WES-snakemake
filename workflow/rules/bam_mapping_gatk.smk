@@ -226,7 +226,7 @@ rule fastqc:
     output:
         html="results/qc/fastqc/{run}/{sample}_fastqc.html",
     params:
-        outdir=lambda wildcards, output: os.path.dirname(output.html)
+        outdir=lambda wildcards, output: os.path.dirname(output.html),
     conda:
         "../envs/qc.yaml"
     threads: 2
