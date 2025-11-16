@@ -38,33 +38,37 @@ Other resources:
 
 Create comma-separated table `samplesheet.csv` with columns:
 
-* **ID**: Run identifier for grouping samples from the same origin.
-* **sample**: Unique sample identifier.
+* **ID**: Sample group identifier for grouping samples from the same origin. Usually a patient ID.
+* **sample**: Sample identifier unique for the given ID.
 * **sample_type**: Sample type - `CTRL` for normal samples, `PDX` for xenograft samples, any other value would be interpreted as a tumor sample.
 * **Chr_sex**: Chromosomal sex of each sample, `XX` for female and `XY` for male.
 * **probes**: Exome library kit version.
+* **purity**: Known cancer/normal cell ratio, from 0 to 1. Used in CNVkit `call` and CCF calculation.
 * **fq1**: Full path to R1 FASTQ file
 * **fq2**: Full path to R2 FASTQ file
 
 Example format:
 
-| run | samplename | type | Chr_sex | probes | fq1 | fq2 |
-|-----|------------|------|---------|--------|-----|-----|
-| Run1 | Normal01 | CTRL  | XY | V6+UTR | /path/to/Normal01_R1.fastq.gz | /path/to/Normal01_R2.fastq.gz |
-| Run1 | Tumor01  | Tumor | XY | V6+UTR | /path/to/Tumor01_R1.fastq.gz | /path/to/Tumor01_R2.fastq.gz |
-| Run1 | Model01  | PDX   | XY | V6+UTR | /path/to/Model01_R1.fastq.gz | /path/to/Model01_R2.fastq.gz |
+| ID   |   sample   | sample_type | Chr_sex | probes |  purity |  fq1 | fq2 |
+|------|------------|-------------|---------|--------|---------|------|-----|
+| Pt01 |  Normal01  |     CTRL    |    XY   | V8+UTR |    0    | /path/to/Normal01_R1.fastq.gz | /path/to/Normal01_R2.fastq.gz |
+| Pt01 |  Tumor01   |     Tumor   |    XY   | V8+UTR |    0.7  | /path/to/Tumor01_R1.fastq.gz  | /path/to/Tumor01_R2.fastq.gz  |
+| Pt01 |  Tumor02   |     Tumor   |    XY   | V8+UTR |    0.3  | /path/to/Tumor02_R1.fastq.gz  | /path/to/Tumor02_R2.fastq.gz  |
+| Pt01 |  Model01   |     PDX     |    XY   | V8+UTR |    1    | /path/to/Model01_R1.fastq.gz  | /path/to/Model01_R2.fastq.gz  |
 
 Each run must have exactly one normal/germline sample to which all other samples would be compared.
 
 ### Launching the Pipeline
 
-Before launching the pipeline, check the profile config in `profiles/default/config.yaml`. The workflow requires both conda and singularity. 
+Before launching the pipeline, check the profile config in `profiles/default/config.yaml`. The workflow requires both conda and singularity.
 
 **For containers to work you have to bind the reference directory!** I.e., all required reference sources should be put in this directory. Edit the `singularity-args` parameter in the profile config:
 
 ```yaml
 singularity-args: "-B /path/to/refs:/path/to/refs"
 ```
+
+Use `snakemake --profile profiles/default -n` to test the pipeline ("dry run").
 
 Use `launch.sh` which would attempt to launch snakemake in the detached mode in the background, or run in the foreground using `snakemake --profile profiles/default`.
 
