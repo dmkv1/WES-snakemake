@@ -10,7 +10,14 @@ def get_cnvkit_reference(wildcards):
 
 
 def get_normal_sample_name(wildcards):
+    """Get normal sample name, returns None for tumor-only"""
     return runs_dict[wildcards.run]["normal"]
+
+
+def get_normal_sample_name_or_empty(wildcards):
+    """Get normal sample name, returns empty string for tumor-only (for shell params)"""
+    normal = runs_dict[wildcards.run]["normal"]
+    return normal if normal else ""
 
 
 def get_sample_sex(wildcards):
@@ -100,36 +107,51 @@ rule gatk_haplotypecaller:
 
 rule cnvkit_merge_germline_and_filter_hetsnp:
     input:
-        normal=lambda w: f"work/haplotypecaller/{w.run}/{runs_dict[w.run]['normal']}/{runs_dict[w.run]['normal']}.germline.vcf",
-        tumor="work/haplotypecaller/{run}/{sample}/{sample}.germline.vcf",
+        normal=lambda w: (
+            f"work/haplotypecaller/{w.run}/{runs_dict[w.run]['normal']}/{runs_dict[w.run]['normal']}.germline.vcf"
+            if not is_tumor_only(w) else []
+        ),
+        tumor=lambda w: (
+            f"work/haplotypecaller/{w.run}/{w.sample}/{w.sample}.germline.vcf"
+            if not is_tumor_only(w) else []
+        ),
     output:
         vcf="work/cnvkit/{run}/{sample}/{sample}.hetsnp.vcf",
     params:
-        normal=lambda w: runs_dict[w.run]["normal"],
+        normal=lambda w: runs_dict[w.run]["normal"] if not is_tumor_only(w) else "",
         tumor=lambda w: w.sample,
+        is_tumor_only=lambda w: is_tumor_only(w),
     conda:
         "../envs/bcftools.yaml"
     log:
         "work/logs/merge_filter_germline_{run}_{sample}.log",
     shell:
         """
-        bgzip -c {input.normal} > {input.normal}.gz 2> {log}
-        tabix -p vcf {input.normal}.gz 2>> {log}
-        
-        bgzip -c {input.tumor} > {input.tumor}.gz 2>> {log}
-        tabix -p vcf {input.tumor}.gz 2>> {log}
-        
-        bcftools merge -m none {input.normal}.gz {input.tumor}.gz -Ou 2>> {log} | \
-        bcftools view -s {params.normal},{params.tumor} -Ou | \
-        bcftools filter -i "
-                TYPE='snp' &&
-                N_ALT==1 &&
-                STRLEN(REF)==1 &&
-                STRLEN(ALT)==1 &&
-                FORMAT/DP[0]>10 &&
-                FORMAT/AD[0:1]>3 &&
-                GT[0]=='0/1' &&
-                FORMAT/DP[1]>10" -Ov -o {output.vcf} 2>> {log}
+        if [ "{params.is_tumor_only}" = "True" ]; then
+            # Tumor-only: create empty VCF (no BAF analysis)
+            echo "##fileformat=VCFv4.2" > {output.vcf}
+            echo "#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO" >> {output.vcf}
+            echo "Tumor-only mode: skipping BAF analysis" > {log}
+        else
+            # Paired mode: existing merge logic
+            bgzip -c {input.normal} > {input.normal}.gz 2> {log}
+            tabix -p vcf {input.normal}.gz 2>> {log}
+
+            bgzip -c {input.tumor} > {input.tumor}.gz 2>> {log}
+            tabix -p vcf {input.tumor}.gz 2>> {log}
+
+            bcftools merge -m none {input.normal}.gz {input.tumor}.gz -Ou 2>> {log} | \
+            bcftools view -s {params.normal},{params.tumor} -Ou | \
+            bcftools filter -i "
+                    TYPE='snp' &&
+                    N_ALT==1 &&
+                    STRLEN(REF)==1 &&
+                    STRLEN(ALT)==1 &&
+                    FORMAT/DP[0]>10 &&
+                    FORMAT/AD[0:1]>3 &&
+                    GT[0]=='0/1' &&
+                    FORMAT/DP[1]>10" -Ov -o {output.vcf} 2>> {log}
+        fi
         """
 
 
@@ -170,8 +192,10 @@ rule cnvkit_segment:
     output:
         cns="work/cnvkit/{run}/{sample}/{sample}.cns",
     params:
-        normal=get_normal_sample_name,
+        normal=get_normal_sample_name_or_empty,
         tumor=lambda w: w.sample,
+        vcf_arg=lambda w: f"-v work/cnvkit/{w.run}/{w.sample}/{w.sample}.hetsnp.vcf" if not is_tumor_only(w) else "",
+        normal_arg=lambda w: f"-n {runs_dict[w.run]['normal']}" if not is_tumor_only(w) else "",
     container:
         "docker://etal/cnvkit:0.9.11"
     log:
@@ -181,8 +205,8 @@ rule cnvkit_segment:
         cnvkit.py segment {input.cnr} \
             -o {output.cns} \
             -m cbs \
-            -v {input.vcf} \
-            -n {params.normal} \
+            {params.vcf_arg} \
+            {params.normal_arg} \
             -i {params.tumor} \
             > {log} 2>&1
         """
@@ -258,11 +282,13 @@ rule cnvkit_call:
     output:
         cns="work/cnvkit/{run}/{sample}/{sample}.call.cns",
     params:
-        normal=get_normal_sample_name,
+        normal=get_normal_sample_name_or_empty,
         tumor=lambda w: w.sample,
         sample_sex=get_sample_sex,
         male_reference=is_male_reference,
         purity=get_purity,
+        vcf_arg=lambda w: f"-v work/cnvkit/{w.run}/{w.sample}/{w.sample}.hetsnp.vcf" if not is_tumor_only(w) else "",
+        normal_arg=lambda w: f"-n {runs_dict[w.run]['normal']}" if not is_tumor_only(w) else "",
     container:
         "docker://etal/cnvkit:0.9.11"
     log:
@@ -270,8 +296,8 @@ rule cnvkit_call:
     shell:
         """
         cnvkit.py call {input.cns} \
-            -v {input.vcf} \
-            -n {params.normal} \
+            {params.vcf_arg} \
+            {params.normal_arg} \
             -i {params.tumor} \
             --sample-sex {params.sample_sex} \
             {params.male_reference} \
@@ -293,8 +319,10 @@ rule cnvkit_plots:
         scatter="results/{run}/{sample}/{sample}.scatter.png",
         diagram="results/{run}/{sample}/{sample}.diagram.pdf",
     params:
-        normal=get_normal_sample_name,
+        normal=get_normal_sample_name_or_empty,
         tumor=lambda w: w.sample,
+        vcf_arg=lambda w: f"-v work/cnvkit/{w.run}/{w.sample}/{w.sample}.hetsnp.vcf" if not is_tumor_only(w) else "",
+        normal_arg=lambda w: f"-n {runs_dict[w.run]['normal']}" if not is_tumor_only(w) else "",
     container:
         "docker://etal/cnvkit:0.9.11"
     log:
@@ -303,8 +331,8 @@ rule cnvkit_plots:
         """
         cnvkit.py scatter {input.cnr} \
             -s {input.cns} \
-            -v {input.vcf} \
-            -n {params.normal} \
+            {params.vcf_arg} \
+            {params.normal_arg} \
             -i {params.tumor} \
             --title {params.tumor} \
             --y-max 4 --y-min -4 \
@@ -317,5 +345,5 @@ rule cnvkit_plots:
             --no-gene-labels \
             --title {params.tumor} \
             -o {output.diagram} \
-            > {log} 2>&1
+            >> {log} 2>&1
         """

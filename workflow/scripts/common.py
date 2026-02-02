@@ -61,3 +61,14 @@ def parse_fastq_header(fastq_path: str, sample_name: str) -> Dict[str, str]:
 def get_read_group_params(wildcards) -> Dict[str, str]:
     fq1_path = fastq_dict[wildcards.run][wildcards.sample]["fq1"]
     return parse_fastq_header(fq1_path, wildcards.sample)
+
+
+def is_tumor_only(wildcards):
+    """Check if run has no matched normal"""
+    return runs_dict[wildcards.run]["normal"] is None
+
+
+def get_pon_path(wildcards):
+    """Get PON VCF path for tumor-only samples"""
+    probe = probe_dict[wildcards.run][wildcards.sample]
+    return config["tumor_only"]["pon"][probe]

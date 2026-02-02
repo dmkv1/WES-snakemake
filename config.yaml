@@ -51,6 +51,12 @@ params:
     cnvkit:
       filter_ci: false  # Set to true to enable segments filtering based on CI
 
+tumor_only:
+  pon:
+    "V6+UTR": "/mnt/data/NGS/refs/Mutect2_PON/results/pon/pon_SureSelectV6UTR.vcf.gz"
+    "V8+UTR": "/mnt/data/NGS/refs/Mutect2_PON/results/pon/pon_SureSelectV8UTR.vcf.gz"
+  af_threshold: 0.001  # Filter variants with population AF > this
+
 resources:
   threads: 32
   java_max_gb: 256

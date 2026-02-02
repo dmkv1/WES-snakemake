@@ -1,7 +1,10 @@
 rule run_manta:
     input:
-        normal=lambda w: f"results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam",
         tumor=lambda w: f"results/{w.run}/{w.sample}/bam/{w.sample}.bam",
+        normal=lambda w: (
+            f"results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam"
+            if not is_tumor_only(w) else []
+        ),
         refg=config["refs"]["genome_human"],
         regions_bed=lambda w: f"work/refs/regions/{get_probe_version(w)}/regions.bed.gz",
         regions_tbi=lambda w: f"work/refs/regions/{get_probe_version(w)}/regions.bed.gz.tbi",
@@ -9,10 +12,16 @@ rule run_manta:
         workspace_dir=directory("work/manta/{run}/{sample}/workspace"),
         workflow="work/manta/{run}/{sample}/runWorkflow.py",
         workflow_pickle="work/manta/{run}/{sample}/runWorkflow.py.config.pickle",
-        vcf_somaticSV="work/manta/{run}/{sample}/results/variants/somaticSV.vcf.gz",
-        tbi_somaticSV="work/manta/{run}/{sample}/results/variants/somaticSV.vcf.gz.tbi",
+        vcf_sv="work/manta/{run}/{sample}/results/variants/sv_output.vcf.gz",
+        tbi_sv="work/manta/{run}/{sample}/results/variants/sv_output.vcf.gz.tbi",
     params:
         res_dir="work/manta/{run}/{sample}",
+        normal_arg=lambda w: (
+            f"--normalBam results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam"
+            if not is_tumor_only(w) else ""
+        ),
+        # Tumor-only outputs tumorSV.vcf.gz, paired outputs somaticSV.vcf.gz
+        sv_output_name=lambda w: "tumorSV" if is_tumor_only(w) else "somaticSV",
     resources:
         threads=config["resources"]["threads"],
         mem_gb=config["resources"]["manta_max_gb"],
@@ -24,7 +33,7 @@ rule run_manta:
         """
         configManta.py --exome \
         --referenceFasta {input.refg} \
-        --normalBam {input.normal} \
+        {params.normal_arg} \
         --tumorBam {input.tumor} \
         --runDir {params.res_dir} \
         --callRegions {input.regions_bed} \
@@ -34,13 +43,17 @@ rule run_manta:
         --mode local \
         --jobs {resources.threads} --memGb {resources.mem_gb} \
         >> {log} 2>&1
+
+        # Rename output to consistent name regardless of mode
+        mv {params.res_dir}/results/variants/{params.sv_output_name}.vcf.gz {output.vcf_sv}
+        mv {params.res_dir}/results/variants/{params.sv_output_name}.vcf.gz.tbi {output.tbi_sv}
         """
 
 
 rule filter_manta_variants:
     input:
-        vcf="work/manta/{run}/{sample}/results/variants/somaticSV.vcf.gz",
-        tbi="work/manta/{run}/{sample}/results/variants/somaticSV.vcf.gz.tbi",
+        vcf="work/manta/{run}/{sample}/results/variants/sv_output.vcf.gz",
+        tbi="work/manta/{run}/{sample}/results/variants/sv_output.vcf.gz.tbi",
     output:
         vcf="work/manta/{run}/{sample}/{sample}.SV.filtered.vcf",
     conda:

@@ -17,14 +17,18 @@ if not invalid_sex.empty:
 
 # Create a dictionary of runs and their samples
 # {'ID': {'normal': 'CTRL', 'tumors': ['PT', 'PDX']}}
+# For tumor-only runs, normal will be None
 runs_dict = {}
 for run in samples["ID"].unique():
     if pd.isna(run):
         continue
     run_samples = samples[samples["ID"] == run]
+    ctrl_samples = run_samples[run_samples["sample_type"] == "CTRL"]["sample"].tolist()
+    tumor_samples = run_samples[run_samples["sample_type"] != "CTRL"]["sample"].tolist()
+
     runs_dict[run] = {
-        "normal": run_samples[run_samples["sample_type"] == "CTRL"]["sample"].iloc[0],
-        "tumors": run_samples[run_samples["sample_type"] != "CTRL"]["sample"].tolist(),
+        "normal": ctrl_samples[0] if ctrl_samples else None,
+        "tumors": tumor_samples,
     }
 
 # Create a dictionary of PDX samples
@@ -64,6 +68,13 @@ for _, row in samples.iterrows():
             purity_dict[row["ID"]] = {}
         purity_dict[row["ID"]][row["sample"]] = row["purity"]
 
+# Validate tumor-only runs have PON configured
+for run, data in runs_dict.items():
+    if data["normal"] is None:
+        for sample in data["tumors"]:
+            probe = probe_dict[run][sample]
+            if probe not in config.get("tumor_only", {}).get("pon", {}):
+                raise ValueError(f"No PON configured for probe '{probe}' (tumor-only run '{run}')")
 
 
 wildcard_constraints:

@@ -5,16 +5,25 @@ def get_normal_sample(wildcards):
 
 rule run_mutect2:
     input:
-        normal=lambda w: f"results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam",
         tumor=lambda w: f"results/{w.run}/{w.sample}/bam/{w.sample}.bam",
+        normal=lambda w: (
+            f"results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam"
+            if not is_tumor_only(w) else []
+        ),
         refg=config["refs"]["genome_human"],
         regions=lambda w: f"work/refs/regions/{get_probe_version(w)}/regions.bed",
+        pon=lambda w: get_pon_path(w) if is_tumor_only(w) else [],
     output:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf",
         idx="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.idx",
         stats="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.stats",
     params:
-        normal_name=get_normal_sample,
+        normal_args=lambda w: (
+            f"-I results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam "
+            f"-normal {runs_dict[w.run]['normal']}"
+            if not is_tumor_only(w) else ""
+        ),
+        pon_arg=lambda w: f"--panel-of-normals {get_pon_path(w)}" if is_tumor_only(w) else "",
         germline=config["refs"]["germline_resource"],
         ref_path=config["refs"]["path"],
     threads: config["resources"]["threads"]
@@ -33,10 +42,10 @@ rule run_mutect2:
         --native-pair-hmm-threads {threads} \
         -R {input.refg} \
         --germline-resource {params.germline} \
+        {params.pon_arg} \
         --intervals {input.regions} \
-        -I {input.normal} \
+        {params.normal_args} \
         -I {input.tumor} \
-        -normal {params.normal_name} \
         -O {output.vcf} \
         > {log} 2>&1
         """
@@ -89,9 +98,37 @@ rule filter_and_sort_mutect2_calls:
         """
 
 
-rule funcotator:
+rule filter_population_af:
+    """Filter variants with population AF > threshold (tumor-only only)"""
     input:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.final.vcf",
+        gnomad=config["refs"]["germline_resource"],
+    output:
+        vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.af_filtered.vcf",
+    params:
+        af_threshold=config.get("tumor_only", {}).get("af_threshold", 0.001),
+        is_tumor_only=lambda w: is_tumor_only(w),
+    conda:
+        "../envs/bcftools.yaml"
+    log:
+        "work/logs/filter_population_af_{run}_{sample}.log",
+    shell:
+        """
+        if [ "{params.is_tumor_only}" = "True" ]; then
+            # Annotate with gnomAD AF and filter
+            bcftools annotate -a {input.gnomad} -c INFO/gnomAD_AF:=INFO/AF \
+                {input.vcf} -Ou 2> {log} | \
+            bcftools filter -e 'INFO/gnomAD_AF > {params.af_threshold}' \
+                -Ov -o {output.vcf} 2>> {log}
+        else
+            cp {input.vcf} {output.vcf}
+        fi
+        """
+
+
+rule funcotator:
+    input:
+        vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.af_filtered.vcf",
         refg=config["refs"]["genome_human"],
     output:
         vcf="results/{run}/{sample}/{sample}.SNV.vcf",
