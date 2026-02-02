@@ -115,11 +115,15 @@ rule filter_population_af:
     shell:
         """
         if [ "{params.is_tumor_only}" = "True" ]; then
+            # Bgzip and index input for annotation
+            bgzip -c {input.vcf} > {output.vcf}.tmp.gz 2> {log}
+            tabix -p vcf {output.vcf}.tmp.gz 2>> {log}
             # Annotate with gnomAD AF and filter
             bcftools annotate -a {input.gnomad} -c INFO/gnomAD_AF:=INFO/AF \
-                {input.vcf} -Ou 2> {log} | \
+                {output.vcf}.tmp.gz 2>> {log} | \
             bcftools filter -e 'INFO/gnomAD_AF > {params.af_threshold}' \
                 -Ov -o {output.vcf} 2>> {log}
+            rm -f {output.vcf}.tmp.gz {output.vcf}.tmp.gz.tbi
         else
             cp {input.vcf} {output.vcf}
         fi
