@@ -15,6 +15,18 @@ if not invalid_sex.empty:
         f"Invalid Chr_sex values found. Must be 'XX' or 'XY':\n{invalid_samples}"
     )
 
+# Validate fastq files exist
+missing_files = []
+for _, row in samples.iterrows():
+    for fq_col in ["fq1", "fq2"]:
+        fq_path = row[fq_col]
+        if pd.notna(fq_path) and not os.path.exists(fq_path):
+            missing_files.append(f"  {row['ID']}/{row['sample']}: {fq_path}")
+if missing_files:
+    raise FileNotFoundError(
+        f"FASTQ files not found:\n" + "\n".join(missing_files)
+    )
+
 # Create a dictionary of runs and their samples
 # {'ID': {'normal': 'CTRL', 'tumors': ['PT', 'PDX']}}
 # For tumor-only runs, normal will be None
