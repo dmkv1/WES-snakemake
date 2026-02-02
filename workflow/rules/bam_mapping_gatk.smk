@@ -234,37 +234,44 @@ rule fastqc:
         "fastqc {input} -o {params.outdir} -t {threads}"
 
 
+def get_all_samples_for_run(run):
+    """Get all samples (normal + tumors) for a run, excluding None"""
+    normal = runs_dict[run]["normal"]
+    tumors = runs_dict[run]["tumors"]
+    return ([normal] if normal else []) + tumors
+
+
 rule multiqc:
     input:
         [
             f"results/qc/fastqc/{run}/{sample}_fastqc.html"
             for run in runs_dict
-            for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
+            for sample in get_all_samples_for_run(run)
         ],
         [
             f"results/qc/fastp/{run}/{sample}_fastp.html"
             for run in runs_dict
-            for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
+            for sample in get_all_samples_for_run(run)
         ],
         [
             f"results/metrics/{run}_{sample}.mosdepth.summary.txt"
             for run in runs_dict
-            for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
+            for sample in get_all_samples_for_run(run)
         ],
         [
             f"results/metrics/{run}_{sample}.mosdepth.region.dist.txt"
             for run in runs_dict
-            for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
+            for sample in get_all_samples_for_run(run)
         ],
         [
             f"results/metrics/{run}_{sample}.recal_data.table"
             for run in runs_dict
-            for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
+            for sample in get_all_samples_for_run(run)
         ],
         [
             f"results/metrics/dupl_metrics_{run}_{sample}.txt"
             for run in runs_dict
-            for sample in ([runs_dict[run]["normal"]] + runs_dict[run]["tumors"])
+            for sample in get_all_samples_for_run(run)
         ],
     output:
         "results/qc/multiqc_report.html",
