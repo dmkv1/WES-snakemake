@@ -144,13 +144,16 @@ result_snv <- as.data.frame(lapply(result, function(col) {
 # --- Parse CNVkit cns ----
 CNVs.df <- read_tsv(input_cns_cnv, show_col_types = FALSE)
 
+# Check if allele-specific CN columns exist (not available in tumor-only mode)
+has_allele_cn <- all(c("cn1", "cn2") %in% colnames(CNVs.df))
+
 # Convert to GRanges to overlap with the variants
 cnv_gr <- GRanges(
   seqnames = CNVs.df$chromosome,
   ranges = IRanges(start = CNVs.df$start, end = CNVs.df$end),
   cn = CNVs.df$cn,
-  cn1 = CNVs.df$cn1,
-  cn2 = CNVs.df$cn2
+  cn1 = if (has_allele_cn) CNVs.df$cn1 else NA_integer_,
+  cn2 = if (has_allele_cn) CNVs.df$cn2 else NA_integer_
 )
 
 var_chr <- word(result_snv$Position, 1, sep = ":")
