@@ -94,43 +94,17 @@ ad_alt.df <- ad.df %>%
   mutate(across(everything(), ~ sapply(., function(x) x[2]))) %>%
   setNames(paste0("AD_ALT_", colnames(.)))
 
-funcotation <- extractFUNCOTATION(vcf) %>% 
-  dplyr::select(
-    contains("Gencode_"),
-    contains("HGNC_")
-  )
+funcotation <- extractFUNCOTATION(vcf)
 
-result <- cbind(filter.df, gt.df, ad_ref.df, ad_alt.df, af.df, dp.df, funcotation) %>% 
+result <- cbind(filter.df, gt.df, ad_ref.df, ad_alt.df, af.df, dp.df, funcotation) %>%
   rownames_to_column("Variant") %>%
   mutate(Position = word(Variant, 1, sep = "_"),
          .before = "Variant") %>%
   mutate(Variant = word(Variant, 2, sep = "_")) %>%
   dplyr::select(
-    Position,
-    Variant,
-    FILTER,
-    contains("AF_"),
-    contains("GT_"),
-    contains("DP_"),
-    contains("AD_"),
-    contains("Gencode_"),
-    "HGNC_HGNC_ID",
-    "HGNC_Approved_name",
-    "HGNC_Locus_type",
-    "HGNC_Locus_group",
-    "HGNC_Alias_symbols",
-    "HGNC_Alias_names",
-    "HGNC_Chromosome",
-    "HGNC_Accession_numbers",
-    "HGNC_Enzyme_IDs",
-    "HGNC_NCBI_Gene_ID",
-    "HGNC_Ensembl_gene_ID",
-    "HGNC_Pubmed_IDs",
-    "HGNC_RefSeq_IDs",
-    "HGNC_Gene_group_ID",
-    "HGNC_Gene_group_name",
-    "HGNC_UniProt_ID(supplied_by_UniProt)",
-    "HGNC_Ensembl_ID(supplied_by_Ensembl)"
+    Position, Variant, FILTER,
+    matches("^AF_"), matches("^GT_"), matches("^DP_"), matches("^AD_"),
+    everything()
   )
 
 result_snv <- as.data.frame(lapply(result, function(col) {
@@ -246,17 +220,26 @@ result_snv$tumor_cn2 <- tumor_cn2
 # Reorder columns
 result_snv <- result_snv %>%
   dplyr::select(
-    Position,
-    Variant,
-    FILTER,
-    contains("AF_"),
-    contains("GT_"),
-    normal_cn,
-    tumor_cn,
-    tumor_cn1,
-    tumor_cn2,
-    expected_mutant_copies,
-    CCF,
+    # Core variant info
+    Position, Variant, FILTER,
+    # Sample-level genotype data
+    matches("^AF_"), matches("^GT_"), matches("^DP_"), matches("^AD_"),
+    # Copy number & clonality
+    normal_cn, tumor_cn, tumor_cn1, tumor_cn2, expected_mutant_copies, CCF,
+    # Gene annotation
+    starts_with("Gencode_"),
+    # Population frequencies
+    starts_with("gnomAD_exome_"), starts_with("gnomAD_genome_"),
+    # Clinical & somatic databases
+    starts_with("ClinVar_VCF_"),
+    starts_with("Cosmic_"), starts_with("CosmicFusion_"), starts_with("CosmicTissue_"),
+    # Gene info & other references
+    starts_with("HGNC_"),
+    starts_with("Familial_"), starts_with("Achilles_"),
+    starts_with("Oreganno_"), starts_with("Simple_Uniprot_"),
+    # dbSNP (many flag columns, at end)
+    starts_with("dbSNP_"),
+    # Catch-all for any future additions
     everything()
   )
 

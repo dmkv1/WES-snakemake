@@ -26,6 +26,28 @@ Resources which can be downloaded from the [GATK resource bucket](https://consol
 * Known sites for base recalibration - can be downloaded from , files `Homo_sapiens_assembly38.dbsnp138.vcf`, `Homo_sapiens_assembly38.known_indels.vcf.gz` and `Mills_and_1000G_gold_standard.indels.hg38.vcf.gz`
 * Germline resource for Mutect2 - `af-only-gnomad.hg38.vcf.gz`
 * Funcotator data sources - [`funcotator_dataSources.v1.8.hg38.20230908s`](https://console.cloud.google.com/storage/browser/broad-public-datasets/funcotator/funcotator_dataSources.v1.8.hg38.20230908s)
+
+#### Enabling gnomAD exome/genome annotations in Funcotator
+
+By default, gnomAD_exome and gnomAD_genome are disabled in the Funcotator data sources. To enable them:
+
+1. Extract the tarballs in the data sources directory:
+   ```bash
+   cd <funcotator_dataSources_dir>
+   tar xzf gnomAD_exome.tar.gz
+   tar xzf gnomAD_genome.tar.gz
+   ```
+
+2. **Fix the GCS bucket path** — the default config points to a requester-pays bucket
+   that errors with `"Bucket is a requester pays bucket but no user project provided."`.
+   Edit `gnomAD_exome/hg38/gnomAD_exome.config` and `gnomAD_genome/hg38/gnomAD_genome.config`:
+   ```
+   # Change:
+   src_file=gs://broad-public-datasets
+   # To:
+   src_file=gs://gcp-public-data--broad-references
+   ```
+   Ref: [GATK releases — Funcotator Data Location Moved](https://github.com/broadinstitute/gatk/releases)
 * Host reference genome in fasta format for PDX samples (mm39)
 
 Other resources:
