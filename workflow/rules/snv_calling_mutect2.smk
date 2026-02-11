@@ -141,9 +141,9 @@ rule funcotator:
         genome_ver=config["refs"]["funcotator_data_sources"]["genome_version"],
         data_sources=config["refs"]["funcotator_data_sources"]["path"],
         ref_path=config["refs"]["path"],
+    threads: 8
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
     log:
         "work/logs/Funcotator_{run}_{sample}.log",
     container:
@@ -151,7 +151,7 @@ rule funcotator:
     shell:
         """
         gatk \
-        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        --java-options "-Xms4G -Xmx{resources.java_max_gb}G" \
         Funcotator \
         --reference {input.refg} \
         --ref-version {params.genome_ver} \
