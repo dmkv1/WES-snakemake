@@ -70,29 +70,34 @@ filter.df <- rowRanges(vcf) %>%
   as.data.frame() %>% 
   dplyr::select("FILTER")
   
+# Determine generic role names for genotype columns
+# Mutect2 convention: paired = [normal, tumor]; tumor-only = [tumor]
+n_geno_samples <- ncol(geno(vcf)[["AF"]])
+geno_roles <- if (n_geno_samples == 2) c("ctrl", "tumor") else "tumor"
+
 af.df <- as.data.frame(geno(vcf)[["AF"]]) %>%
   mutate_all( ~ unlist(.)) %>%
-  setNames(., paste0("AF_", colnames(.)))
+  setNames(paste0("AF_", geno_roles))
 
 gt.df <- as.data.frame(geno(vcf)[["GT"]]) %>%
   mutate_all( ~ unlist(.)) %>%
-  setNames(., paste0("GT_", colnames(.)))
+  setNames(paste0("GT_", geno_roles))
 
 dp.df <- as.data.frame(geno(vcf)[["DP"]]) %>%
   mutate_all( ~ unlist(.)) %>%
-  setNames(., paste0("DP_", colnames(.)))
+  setNames(paste0("DP_", geno_roles))
 
 ad.df <- as.data.frame(geno(vcf)[["AD"]])
 
 # Extract REF counts (first element)
 ad_ref.df <- ad.df %>%
   mutate(across(everything(), ~ sapply(., function(x) x[1]))) %>%
-  setNames(paste0("AD_REF_", colnames(.)))
+  setNames(paste0("AD_REF_", geno_roles))
 
 # Extract ALT counts (second element)
 ad_alt.df <- ad.df %>%
   mutate(across(everything(), ~ sapply(., function(x) x[2]))) %>%
-  setNames(paste0("AD_ALT_", colnames(.)))
+  setNames(paste0("AD_ALT_", geno_roles))
 
 funcotation <- extractFUNCOTATION(vcf)
 
@@ -157,14 +162,9 @@ tumor_cn <- ifelse(
   tumor_cn
 )
 
-# Calculate CCF
-# Get tumor AF (last column in AF columns, which is the tumor sample)
-af_cols <- grep("^AF_", colnames(result_snv))
-tumor_af <- result_snv[, af_cols[length(af_cols)]]  # Last AF column is tumor
-
-# Get tumor GT (last column in GT columns)
-gt_cols <- grep("^GT_", colnames(result_snv))
-tumor_gt <- result_snv[, gt_cols[length(gt_cols)]]
+# Calculate CCF using the generic tumor column names
+tumor_af <- result_snv[["AF_tumor"]]
+tumor_gt <- result_snv[["GT_tumor"]]
 
 # Normalize GT format - replace phasing delimiter with /
 tumor_gt_normalized <- gsub("\\|", "/", tumor_gt)
