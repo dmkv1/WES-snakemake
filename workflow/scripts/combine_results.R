@@ -255,3 +255,8 @@ result_list <- list(
 
 output_file_path <- snakemake@output[["xlsx"]]
 write.xlsx(result_list, output_file_path, overwrite = TRUE)
+
+# Also write per-type CSVs for downstream row-binding (avoids xlsx type guessing)
+write_csv(result_snv, snakemake@output[["snv_csv"]])
+write_csv(CNVs.df,    snakemake@output[["cnv_csv"]])
+write_csv(SVs.df,     snakemake@output[["sv_csv"]])

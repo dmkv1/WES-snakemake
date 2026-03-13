@@ -127,6 +127,9 @@ rule all:
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
+        # Combined tables for downstream analysis (Wesseract etc.)
+        "results/combined/combined_snvs.rds",
+        "results/combined/combined_cnvs.rds",
         # SNV/Indel VCFs (Mutect2)
         [
             f"results/{run}/{sample}/{sample}.SNV.vcf"
