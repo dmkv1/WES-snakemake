@@ -130,6 +130,7 @@ rule all:
         # Combined tables for downstream analysis (Wesseract etc.)
         "results/combined/combined_snvs.rds",
         "results/combined/combined_cnvs.rds",
+        "results/combined/combined_svs.rds",
         # SNV/Indel VCFs (Mutect2)
         [
             f"results/{run}/{sample}/{sample}.SNV.vcf"

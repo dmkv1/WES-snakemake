@@ -34,6 +34,23 @@ rule combine_all_snvs:
         "../scripts/combine_snvs.R"
 
 
+rule combine_all_svs:
+    input:
+        sv_csvs=[
+            f"results/{run}/{sample}/{sample}_SVs.csv"
+            for run in runs_dict
+            for sample in runs_dict[run]["tumors"]
+        ],
+    output:
+        rds="results/combined/combined_svs.rds",
+    params:
+        samplesheet=config["samplesheet"],
+    conda:
+        "../envs/r_vcf.yaml"
+    script:
+        "../scripts/combine_svs.R"
+
+
 rule combine_all_cnvs:
     input:
         cnv_csvs=[
