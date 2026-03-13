@@ -42,6 +42,9 @@ combined <- bind_rows(snv_list)
 # (individual CSVs were read as all-character to avoid type conflicts)
 combined <- type_convert(combined, col_types = cols())
 
+# Rename samplesheet 'probes' to avoid collision with CNVkit's 'probes' column
+meta <- meta %>% rename(capture_kit = probes)
+
 # Attach samplesheet metadata
 combined <- left_join(combined, meta, by = c("sID", "ID"))
 

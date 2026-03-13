@@ -39,6 +39,9 @@ cnv_list <- lapply(csv_files, function(f) {
 combined <- bind_rows(cnv_list)
 combined <- type_convert(combined, col_types = cols())
 
+# Rename samplesheet 'probes' to avoid collision with CNVkit's 'probes' column
+meta <- meta %>% rename(capture_kit = probes)
+
 # Attach samplesheet metadata
 combined <- left_join(combined, meta, by = c("sID", "ID"))
 
