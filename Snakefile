@@ -122,8 +122,10 @@ def _tg_notify(msg):
     env = config.get("telegram_bot_env", "")
     if not env:
         return
+    run_id = config.get("run_id", "")
+    prefix = f"[{run_id}] " if run_id else ""
     shell(f"source {env} && "
-          f"curl -s -d \"chat_id=$TELEGRAM_CHAT_ID&text={msg}\" "
+          f"curl -s -d \"chat_id=$TELEGRAM_CHAT_ID&text={prefix}{msg}\" "
           f"\"https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage\" > /dev/null")
 
 onstart:

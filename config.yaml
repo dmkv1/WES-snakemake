@@ -1,5 +1,6 @@
 samplesheet: "samplesheet.csv"
 telegram_bot_env: ""  # Path to .telegram_bot.env file; leave empty to disable notifications
+run_id: ""            # Human-readable label prepended to Telegram notifications, e.g. "missing_models"
 
 probe_configs:
   "V6+UTR":
