@@ -118,6 +118,24 @@ include: "workflow/rules/sv_calling_manta.smk"
 include: "workflow/rules/cnv_calling_cnvkit.smk"
 include: "workflow/rules/integrate_results.smk"
 
+def _tg_notify(msg):
+    env = config.get("telegram_bot_env", "")
+    if not env:
+        return
+    shell(f"source {env} && "
+          f"curl -s -d \"chat_id=$TELEGRAM_CHAT_ID&text={msg}\" "
+          f"\"https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage\" > /dev/null")
+
+onstart:
+    _tg_notify("WES-snakemake started 🚀")
+
+onsuccess:
+    _tg_notify("WES-snakemake finished successfully ✅")
+
+onerror:
+    _tg_notify("WES-snakemake FAILED ❌ — check snakemake.log")
+
+
 rule all:
     input:
         "results/qc/multiqc_report.html",
@@ -127,10 +145,8 @@ rule all:
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
-        # Combined tables for downstream analysis (Wesseract etc.)
-        "results/combined/combined_snvs.rds",
-        "results/combined/combined_cnvs.rds",
-        "results/combined/combined_svs.rds",
+        # Combined data bundle for downstream analysis (Wesseract etc.)
+        "results/combined/combined_data.rds",
         # SNV/Indel VCFs (Mutect2)
         [
             f"results/{run}/{sample}/{sample}.SNV.vcf"

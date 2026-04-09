@@ -1,4 +1,5 @@
 samplesheet: "samplesheet.csv"
+telegram_bot_env: ""  # Path to .telegram_bot.env file; leave empty to disable notifications
 
 probe_configs:
   "V6+UTR":

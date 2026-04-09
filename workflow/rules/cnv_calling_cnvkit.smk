@@ -133,14 +133,19 @@ rule cnvkit_merge_germline_and_filter_hetsnp:
             echo "#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO" >> {output.vcf}
             echo "Tumor-only mode: skipping BAF analysis" > {log}
         else
-            # Paired mode: existing merge logic
-            bgzip -c {input.normal} > {input.normal}.gz 2> {log}
-            tabix -p vcf {input.normal}.gz 2>> {log}
+            # Paired mode: bgzip into sample-specific temp files to avoid race conditions
+            # when multiple tumors share the same control
+            TMPDIR=$(dirname {output.vcf})
+            NORMAL_GZ="$TMPDIR/{params.normal}.germline.vcf.gz"
+            TUMOR_GZ="$TMPDIR/{params.tumor}.germline.vcf.gz"
 
-            bgzip -c {input.tumor} > {input.tumor}.gz 2>> {log}
-            tabix -p vcf {input.tumor}.gz 2>> {log}
+            bgzip -c {input.normal} > "$NORMAL_GZ" 2> {log}
+            tabix -f -p vcf "$NORMAL_GZ" 2>> {log}
 
-            bcftools merge -m none {input.normal}.gz {input.tumor}.gz -Ou 2>> {log} | \
+            bgzip -c {input.tumor} > "$TUMOR_GZ" 2>> {log}
+            tabix -f -p vcf "$TUMOR_GZ" 2>> {log}
+
+            bcftools merge -m none "$NORMAL_GZ" "$TUMOR_GZ" -Ou 2>> {log} | \
             bcftools view -s {params.normal},{params.tumor} -Ou | \
             bcftools filter -i "
                     TYPE='snp' &&

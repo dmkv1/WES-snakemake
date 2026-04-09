@@ -11,6 +11,7 @@ rule combine_results:
     params:
         purity=get_purity,
         sample_sex=get_sample_sex,
+        normal=lambda w: runs_dict[w.run]["normal"] if runs_dict[w.run]["normal"] else "",
     conda:
         "../envs/r_vcf.yaml"
     script:
@@ -25,7 +26,7 @@ rule combine_all_snvs:
             for sample in runs_dict[run]["tumors"]
         ],
     output:
-        rds="results/combined/combined_snvs.rds",
+        rds=temp("results/combined/combined_snvs.rds"),
     params:
         samplesheet=config["samplesheet"],
     conda:
@@ -42,7 +43,7 @@ rule combine_all_svs:
             for sample in runs_dict[run]["tumors"]
         ],
     output:
-        rds="results/combined/combined_svs.rds",
+        rds=temp("results/combined/combined_svs.rds"),
     params:
         samplesheet=config["samplesheet"],
     conda:
@@ -59,10 +60,23 @@ rule combine_all_cnvs:
             for sample in runs_dict[run]["tumors"]
         ],
     output:
-        rds="results/combined/combined_cnvs.rds",
+        rds=temp("results/combined/combined_cnvs.rds"),
     params:
         samplesheet=config["samplesheet"],
     conda:
         "../envs/r_vcf.yaml"
     script:
         "../scripts/combine_cnvs.R"
+
+
+rule bundle_combined_data:
+    input:
+        snv="results/combined/combined_snvs.rds",
+        cnv="results/combined/combined_cnvs.rds",
+        sv="results/combined/combined_svs.rds",
+    output:
+        rds="results/combined/combined_data.rds",
+    conda:
+        "../envs/r_vcf.yaml"
+    script:
+        "../scripts/bundle_data.R"
