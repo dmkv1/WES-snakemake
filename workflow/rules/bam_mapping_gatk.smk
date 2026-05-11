@@ -42,7 +42,7 @@ rule bwa_map:
     log:
         "work/logs/bwamem_{run}_{sample}.log",
     shell:
-        "(bwa mem -M -t {threads} {input.refg} {input.fq1} {input.fq2} | samtools view -Sb - > {output}) 2> {log}"
+        "(bwa mem -Y -t {threads} {input.refg} {input.fq1} {input.fq2} | samtools view -Sb - > {output}) 2> {log}"
 
 
 rule add_read_groups:
