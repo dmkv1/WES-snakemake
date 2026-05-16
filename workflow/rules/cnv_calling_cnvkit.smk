@@ -72,16 +72,45 @@ rule cnvkit_coverage_and_fix:
         """
 
 
+def _is_paired_tumor(w):
+    """True for a tumour sample in paired mode (i.e. not tumour-only and not
+    the run's matched normal)."""
+    return not is_tumor_only(w) and w.sample != runs_dict[w.run]["normal"]
+
+
 rule gatk_haplotypecaller:
     input:
         bam="results/{run}/{sample}/bam/{sample}.bam",
         bai="results/{run}/{sample}/bam/{sample}.bai",
         refg=config["refs"]["genome_human"],
         regions=lambda w: f"work/refs/regions/{probe_dict[w.run][w.sample]}/regions.bed",
+        # Paired tumour only: the matched normal's het sites, used to force-call
+        het_sites=lambda w: (
+            f"work/haplotypecaller/{w.run}/normal_het_sites.vcf.gz"
+            if _is_paired_tumor(w) else []
+        ),
+        het_sites_tbi=lambda w: (
+            f"work/haplotypecaller/{w.run}/normal_het_sites.vcf.gz.tbi"
+            if _is_paired_tumor(w) else []
+        ),
     output:
         vcf="work/haplotypecaller/{run}/{sample}/{sample}.germline.vcf",
         idx="work/haplotypecaller/{run}/{sample}/{sample}.germline.vcf.idx",
     params:
+        # Paired tumour: --alleles force-calls the matched normal's het sites
+        # "regardless of evidence" (GATK 4.6 HaplotypeCaller — no separate
+        # --force-call flag; that is Mutect2-only), so a record with true AD
+        # exists at every het position regardless of tumour copy number — the
+        # BAF track is no longer blanked in aneuploid/LoH regions.
+        # Normal / tumour-only: standard exome calling.
+        target_args=lambda w: (
+            (
+                f"-L work/haplotypecaller/{w.run}/normal_het_sites.vcf.gz "
+                f"--alleles work/haplotypecaller/{w.run}/normal_het_sites.vcf.gz"
+            )
+            if _is_paired_tumor(w)
+            else f"-L work/refs/regions/{probe_dict[w.run][w.sample]}/regions.bed"
+        ),
         ref_path=config["refs"]["path"],
     threads: config["resources"]["threads"]
     resources:
@@ -98,10 +127,40 @@ rule gatk_haplotypecaller:
         HaplotypeCaller \
         -R {input.refg} \
         -I {input.bam} \
-        -L {input.regions} \
+        {params.target_args} \
         -O {output.vcf} \
         --native-pair-hmm-threads {threads} \
         > {log} 2>&1
+        """
+
+
+rule extract_normal_het_sites:
+    """Heterozygous biallelic SNP sites from the matched normal. Drives the
+    tumour force-call (--alleles) so BAF sites survive in CNV/LoH regions.
+    Mirrors the normal-side criteria of cnvkit_merge_germline_and_filter_hetsnp."""
+    input:
+        normal=lambda w: (
+            f"work/haplotypecaller/{w.run}/{runs_dict[w.run]['normal']}/"
+            f"{runs_dict[w.run]['normal']}.germline.vcf"
+        ),
+    output:
+        vcf="work/haplotypecaller/{run}/normal_het_sites.vcf.gz",
+        tbi="work/haplotypecaller/{run}/normal_het_sites.vcf.gz.tbi",
+    conda:
+        "../envs/bcftools.yaml"
+    log:
+        "work/logs/extract_normal_het_sites_{run}.log",
+    shell:
+        """
+        bcftools filter -i "
+                TYPE='snp' &&
+                N_ALT==1 &&
+                STRLEN(REF)==1 &&
+                STRLEN(ALT)==1 &&
+                FORMAT/DP[0]>10 &&
+                FORMAT/AD[0:1]>3 &&
+                GT[0]=='0/1'" {input.normal} -Oz -o {output.vcf} 2> {log}
+        tabix -p vcf {output.vcf} 2>> {log}
         """
 
 
