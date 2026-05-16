@@ -78,12 +78,89 @@ rule learn_read_orientation_model:
         """
 
 
+rule get_pileup_summaries:
+    """Tabulate ref/alt counts at common biallelic germline SNPs (per BAM,
+    runs for tumour and, in paired mode, the matched normal)."""
+    input:
+        bam="results/{run}/{sample}/bam/{sample}.bam",
+        refg=config["refs"]["genome_human"],
+        common=config["refs"]["contamination_resource"],
+        regions=lambda w: f"work/refs/regions/{get_probe_version(w)}/regions.bed",
+    output:
+        pileups="work/mutect2/{run}/{sample}/{sample}.pileups.table",
+    params:
+        ref_path=config["refs"]["path"],
+    resources:
+        java_max_gb=config["resources"]["java_max_gb"],
+        java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "work/logs/GetPileupSummaries_{run}_{sample}.log",
+    container:
+        "docker://broadinstitute/gatk:4.6.1.0"
+    shell:
+        """
+        gatk \
+        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        GetPileupSummaries \
+        -R {input.refg} \
+        -I {input.bam} \
+        -V {input.common} \
+        -L {input.common} \
+        -L {input.regions} \
+        --interval-set-rule INTERSECTION \
+        -O {output.pileups} \
+        > {log} 2>&1
+        """
+
+
+rule calculate_contamination:
+    """Estimate cross-sample contamination + tumour segmentation. Uses the
+    matched normal's pileups when paired; tumour-only otherwise."""
+    input:
+        tumor_pileups="work/mutect2/{run}/{sample}/{sample}.pileups.table",
+        normal_pileups=lambda w: (
+            f"work/mutect2/{w.run}/{runs_dict[w.run]['normal']}/"
+            f"{runs_dict[w.run]['normal']}.pileups.table"
+            if not is_tumor_only(w) else []
+        ),
+    output:
+        contamination="work/mutect2/{run}/{sample}/{sample}.contamination.table",
+        segments="work/mutect2/{run}/{sample}/{sample}.segments.table",
+    params:
+        matched_arg=lambda w: (
+            f"-matched work/mutect2/{w.run}/{runs_dict[w.run]['normal']}/"
+            f"{runs_dict[w.run]['normal']}.pileups.table"
+            if not is_tumor_only(w) else ""
+        ),
+        ref_path=config["refs"]["path"],
+    resources:
+        java_max_gb=config["resources"]["java_max_gb"],
+        java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "work/logs/CalculateContamination_{run}_{sample}.log",
+    container:
+        "docker://broadinstitute/gatk:4.6.1.0"
+    shell:
+        """
+        gatk \
+        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        CalculateContamination \
+        -I {input.tumor_pileups} \
+        {params.matched_arg} \
+        --tumor-segmentation {output.segments} \
+        -O {output.contamination} \
+        > {log} 2>&1
+        """
+
+
 rule filter_mutect2_calls:
     input:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf",
         idx="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.idx",
         stats="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.stats",
         ob_priors="work/mutect2/{run}/{sample}/{sample}.read-orientation-model.tar.gz",
+        contamination="work/mutect2/{run}/{sample}/{sample}.contamination.table",
+        segments="work/mutect2/{run}/{sample}/{sample}.segments.table",
         refg=config["refs"]["genome_human"],
     output:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.filtered.vcf",
@@ -108,6 +185,8 @@ rule filter_mutect2_calls:
         -O {output.vcf} \
         --stats {input.stats} \
         --orientation-bias-artifact-priors {input.ob_priors} \
+        --contamination-table {input.contamination} \
+        --tumor-segmentation {input.segments} \
         --filtering-stats {output.filtering_stats} \
         > {log} 2>&1
         """

@@ -12,7 +12,7 @@
 
 4. ~~**No orientation bias modeling**~~ ✅ — fixed: added `--f1r2-tar-gz` output to `run_mutect2`, new `learn_read_orientation_model` rule, and `--orientation-bias-artifact-priors` to `filter_mutect2_calls` in `snv_calling_mutect2.smk`. Verified end-to-end on `P005_PT`: model trains (SUCCESS, all 32 contexts converged), `FilterMutectCalls` consumes the priors, and an `orientation` row now appears in the filtering stats with the filter applied in the VCF — at zero measurable sensitivity cost (FNR 0.0). Applied unconditionally (GATK default best-practice); old runs branched, not retro-applied.
 
-5. **No contamination estimation** — `GetPileupSummaries` + `CalculateContamination` missing before `FilterMutectCalls`. Without this, Mutect2 filtering runs on incorrect priors; contaminated samples pass more false positives.
+5. ~~**No contamination estimation**~~ ✅ — fixed: added `contamination_resource` (`small_exac_common_3.hg38.vcf.gz`) to config, a generic per-sample `get_pileup_summaries` rule (capture-region ∩ common-SNP intersection, runs for tumour and matched normal), a paired/tumour-only `calculate_contamination` rule, and `--contamination-table` + `--tumor-segmentation` into `filter_mutect2_calls` (alongside #4's orientation priors). Verified end-to-end on `P005_PT` (paired, V6 CTRL / V6 PT): all rules `SUCCESS`, contamination 3.3e-4 ± 1.6e-4 (pure tumour, correctly filters nothing), a `contamination` row now present in the filtering stats. Applied unconditionally (GATK best-practice); cross-panel pairs (V6 normal / V8 tumour) tolerated by GATK with coarser segmentation, as noted for #3/#5.
 
 6. **HaplotypeCaller run on tumor BAM for het-SNPs** — diploid caller on an aneuploid tumor miscalls/misses het SNPs in CNV regions, degrading the BAF track precisely where it matters most. Should use normal BAM only.
 
@@ -36,8 +36,10 @@
 
 ## Notable (correctness / maintainability)
 
-13. **`wildcard_constraints` blocks underscores in run IDs** — silent breakage if any samplesheet `ID` contains `_`.
+13. **No orthogonal purity/ploidy estimator (FACETS)** — purity is currently a hardcoded samplesheet constant (CTRL=0, tumors=1); PureCN is the only estimator and its quality is gated by the BAF/het-SNP track (#6, #12). Add **FACETS** (WES tumor/normal, allele-specific CN + purity/ploidy from depth-ratio + BAF) as a second, orthogonal estimator so purity can be reported as a "two methods agree" number rather than an assumption. Cheap interim cross-check available with no new tool: `2 × modal VAF of clonal PASS SNVs in CN-neutral CNVkit segments ≈ purity` (Mutect2 VCF + CNVkit `.cns`, both already produced).
 
-14. **Read group `RGID`/`RGPU` parsing fragile** — encodes only instrument:flowcell, not lane; RGIDs can collide for multi-lane samples.
+14. **`wildcard_constraints` blocks underscores in run IDs** — silent breakage if any samplesheet `ID` contains `_`.
 
-15. **`CollectHsMetrics` missing** — no capture efficiency, on-target rate, or fold-enrichment in MultiQC.
+15. **Read group `RGID`/`RGPU` parsing fragile** — encodes only instrument:flowcell, not lane; RGIDs can collide for multi-lane samples.
+
+16. **`CollectHsMetrics` missing** — no capture efficiency, on-target rate, or fold-enrichment in MultiQC.
