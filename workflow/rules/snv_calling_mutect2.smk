@@ -17,6 +17,7 @@ rule run_mutect2:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf",
         idx="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.idx",
         stats="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.stats",
+        f1r2="work/mutect2/{run}/{sample}/{sample}.f1r2.tar.gz",
     params:
         normal_args=lambda w: (
             f"-I results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam "
@@ -46,7 +47,33 @@ rule run_mutect2:
         --intervals {input.regions} \
         {params.normal_args} \
         -I {input.tumor} \
+        --f1r2-tar-gz {output.f1r2} \
         -O {output.vcf} \
+        > {log} 2>&1
+        """
+
+
+rule learn_read_orientation_model:
+    input:
+        f1r2="work/mutect2/{run}/{sample}/{sample}.f1r2.tar.gz",
+    output:
+        model="work/mutect2/{run}/{sample}/{sample}.read-orientation-model.tar.gz",
+    params:
+        ref_path=config["refs"]["path"],
+    resources:
+        java_max_gb=config["resources"]["java_max_gb"],
+        java_min_gb=config["resources"]["java_min_gb"],
+    log:
+        "work/logs/LearnReadOrientationModel_{run}_{sample}.log",
+    container:
+        "docker://broadinstitute/gatk:4.6.1.0"
+    shell:
+        """
+        gatk \
+        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        LearnReadOrientationModel \
+        -I {input.f1r2} \
+        -O {output.model} \
         > {log} 2>&1
         """
 
@@ -56,6 +83,7 @@ rule filter_mutect2_calls:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf",
         idx="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.idx",
         stats="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf.stats",
+        ob_priors="work/mutect2/{run}/{sample}/{sample}.read-orientation-model.tar.gz",
         refg=config["refs"]["genome_human"],
     output:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.filtered.vcf",
@@ -79,6 +107,7 @@ rule filter_mutect2_calls:
         -V {input.vcf} \
         -O {output.vcf} \
         --stats {input.stats} \
+        --orientation-bias-artifact-priors {input.ob_priors} \
         --filtering-stats {output.filtering_stats} \
         > {log} 2>&1
         """
