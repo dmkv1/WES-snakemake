@@ -19,7 +19,7 @@
 
 ## Significant (suboptimal but not wrong)
 
-7. **`fastp` adapter removal is overlap-only (`--detect_adapter_for_pe` not set)** — default PE mode infers adapters from R1/R2 overlap, which reliably clips short-insert read-through but misses adapter on the minority of long-insert pairs that don't overlap. Adding `--detect_adapter_for_pe` adds sequence-based detection as a backstop. Safe and defensible, but it alters trimmed output slightly → opt-in for future runs only, not retroactive to existing results.
+7. ~~**`fastp` adapter removal is overlap-only (`--detect_adapter_for_pe` not set)**~~ ✅ — added config-gated `params.fastp.detect_adapter_for_pe` toggling the `--detect_adapter_for_pe` flag in the `fastp_trim` rule. Sequence-based detection now layers on top of (does not replace) the default R1/R2 overlap analysis — verified additive on `P005_CTRL`. Shipped default **`true`** for new runs; existing/old runs to be branched and left as-is (the flag alters trimmed output slightly, so it is not retroactively applied to already-processed results).
 
 8. **xengsort mouse-read stats not captured** — fraction of murine reads is critical QC for PDX samples and is currently lost.
 

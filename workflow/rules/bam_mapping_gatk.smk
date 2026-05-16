@@ -8,6 +8,12 @@ rule fastp_trim:
         html="results/qc/fastp/{run}/{sample}_fastp.html",
         json="results/qc/fastp/{run}/{sample}_fastp.json",
     threads: 4
+    params:
+        detect_adapter=(
+            "--detect_adapter_for_pe"
+            if config["params"]["fastp"]["detect_adapter_for_pe"]
+            else ""
+        ),
     conda:
         "../envs/fastp.yaml"
     log:
@@ -16,6 +22,7 @@ rule fastp_trim:
         "fastp -i {input.fq1} -I {input.fq2} "
         "-o {output.fq1} -O {output.fq2} "
         "-h {output.html} -j {output.json} "
+        "{params.detect_adapter} "
         "-w {threads} > {log} 2>&1"
 
 
