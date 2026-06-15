@@ -123,6 +123,14 @@ Use `launch.sh` to launch snakemake in detached/background mode, or run in the f
 
 ## Pipeline Steps
 
+DAG rulegraph of the pipeline generated using
+
+```bash
+snakemake --rulegraph --profile profiles/default | dot -Tpng -o rulegraph.png
+```
+
+![Pipeline rulegraph](rulegraph.png)
+
 ### 1. Quality Control and Trimming
 
 **fastp** trims adapter sequences and performs quality filtering on raw FASTQ reads. Per-sample HTML/JSON reports are collected into the MultiQC report.

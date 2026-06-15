@@ -1,5 +1,9 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
-nohup snakemake --profile profiles/default > snakemake.log 2>&1 & disown
-echo $! > snakemake.pid
+# Run settings (cores, conda, singularity, bind mounts, etc.) live in
+# profiles/default/config.yaml. config.yaml is loaded via the Snakefile.
+# Pass -n (or any extra args) through to snakemake, e.g. ./launch.sh -n
+snakemake \
+    --profile profiles/default \
+    "$@" > snakemake.log 2>&1
