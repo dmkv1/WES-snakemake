@@ -1,0 +1,10 @@
+# Consolidate each sample's MultiQC rows (mirrors WES-PON-smk):
+#   - fastp reports are named by their {sample}_fastp.json filename, then
+#     "_fastp" is stripped, instead of fastp's internal read-name guess.
+#   - ".fixmate" strips the MarkDuplicates INPUT-bam-derived suffix so the dup
+#     metrics row collapses onto the sample.
+use_filename_as_sample_name:
+  - fastp
+extra_fn_clean_exts:
+  - ".fixmate"
+  - "_fastp"

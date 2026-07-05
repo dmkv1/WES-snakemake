@@ -113,6 +113,7 @@ common.config = config
 include: "workflow/rules/ref_index.smk"
 include: "workflow/rules/host_read_filter.smk"
 include: "workflow/rules/bam_mapping_gatk.smk"
+include: "workflow/rules/qc.smk"
 include: "workflow/rules/snv_calling_mutect2.smk"
 include: "workflow/rules/sv_calling_manta.smk"
 include: "workflow/rules/cnv_calling_cnvkit.smk"

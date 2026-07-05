@@ -3,8 +3,8 @@ rule fastp_trim:
         fq1=lambda wildcards: get_fastq1(wildcards),
         fq2=lambda wildcards: get_fastq2(wildcards),
     output:
-        fq1=temp("work/fastq/{run}/{sample}/{sample}.trimmed.1.fq.gz"),
-        fq2=temp("work/fastq/{run}/{sample}/{sample}.trimmed.2.fq.gz"),
+        fq1=temp("work/fastq/{run}/{sample}/{sample}_R1.fq.gz"),
+        fq2=temp("work/fastq/{run}/{sample}/{sample}_R2.fq.gz"),
         html="results/qc/fastp/{run}/{sample}_fastp.html",
         json="results/qc/fastp/{run}/{sample}_fastp.json",
     threads: 4
@@ -33,13 +33,13 @@ rule bwa_map:
             f"work/fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}.xengsort-graft.1.fq.gz"
             if wildcards.run in pdx_dict
             and wildcards.sample in pdx_dict[wildcards.run]
-            else f"work/fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}.trimmed.1.fq.gz"
+            else f"work/fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}_R1.fq.gz"
         ),
         fq2=lambda wildcards: (
             f"work/fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}.xengsort-graft.2.fq.gz"
             if wildcards.run in pdx_dict
             and wildcards.sample in pdx_dict[wildcards.run]
-            else f"work/fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}.trimmed.2.fq.gz"
+            else f"work/fastq/{wildcards.run}/{wildcards.sample}/{wildcards.sample}_R2.fq.gz"
         ),
     output:
         temp("results/{run}/{sample}/bam/{sample}.raw.bam"),
@@ -66,7 +66,7 @@ rule add_read_groups:
     log:
         "work/logs/AddOrReplaceReadGroups_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -97,7 +97,7 @@ rule fix_mate_info:
     log:
         "work/logs/FixMateInformation_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -117,6 +117,7 @@ rule mark_duplicates:
         "results/{run}/{sample}/bam/{sample}.fixmate.bam",
     output:
         bam=temp("results/{run}/{sample}/bam/{sample}.md.bam"),
+        bai=temp("results/{run}/{sample}/bam/{sample}.md.bai"),
         metrics="results/metrics/dupl_metrics_{run}_{sample}.txt",
     params:
         tmp_dir="tmp",
@@ -126,7 +127,7 @@ rule mark_duplicates:
     log:
         "work/logs/MarkDuplicates_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -135,7 +136,7 @@ rule mark_duplicates:
         -I {input} \
         -O {output.bam} \
         -M {output.metrics} \
-        --CREATE_INDEX false \
+        --CREATE_INDEX true \
         --TMP_DIR tmp \
         > {log} 2>&1
         """
@@ -144,7 +145,11 @@ rule mark_duplicates:
 rule create_base_recalibration:
     input:
         bam="results/{run}/{sample}/bam/{sample}.md.bam",
+        bai="results/{run}/{sample}/bam/{sample}.md.bai",
         refg=config["refs"]["genome_human"],
+        regions=lambda wildcards: config["probe_configs"][
+            probe_dict[wildcards.run][wildcards.sample]
+        ]["covered_bedfile"],
     output:
         recal_data="results/metrics/{run}_{sample}.recal_data.table",
     params:
@@ -153,13 +158,14 @@ rule create_base_recalibration:
         known_sites=lambda _: " ".join(
             f"--known-sites {site}" for site in config["refs"]["known_sites"]
         ),
+        interval_padding=config["params"]["bqsr"]["interval_padding"],
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
     log:
         "work/logs/BaseRecalibrator_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -169,6 +175,8 @@ rule create_base_recalibration:
         -O {output.recal_data} \
         -R {input.refg} \
         {params.known_sites} \
+        --intervals {input.regions} \
+        --interval-padding {params.interval_padding} \
         --tmp-dir {params.tmp_dir} \
         > {log} 2>&1
         """
@@ -191,7 +199,7 @@ rule apply_base_recalibration:
     log:
         "work/logs/ApplyBQSR_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -212,7 +220,7 @@ rule mosdepth:
         bai="results/{run}/{sample}/bam/{sample}.bai",
         regions_bed=lambda wildcards: config["probe_configs"][
             probe_dict[wildcards.run][wildcards.sample]
-        ]["regions_bedfile"],
+        ]["covered_bedfile"],
     output:
         summary="results/metrics/{run}_{sample}.mosdepth.summary.txt",
         region_dist="results/metrics/{run}_{sample}.mosdepth.region.dist.txt",
@@ -225,64 +233,3 @@ rule mosdepth:
         "work/logs/mosdepth_{run}_{sample}.log",
     shell:
         "mosdepth --by {input.regions_bed} --thresholds 10,20,30,50 {params.prefix} {input.bam} > {log} 2>&1"
-
-
-rule fastqc:
-    input:
-        "results/{run}/{sample}/bam/{sample}.bam",
-    output:
-        html="results/qc/fastqc/{run}/{sample}_fastqc.html",
-    params:
-        outdir=lambda wildcards, output: os.path.dirname(output.html),
-    conda:
-        "../envs/qc.yaml"
-    threads: 2
-    shell:
-        "fastqc {input} -o {params.outdir} -t {threads}"
-
-
-def get_all_samples_for_run(run):
-    """Get all samples (normal + tumors) for a run, excluding None"""
-    normal = runs_dict[run]["normal"]
-    tumors = runs_dict[run]["tumors"]
-    return ([normal] if normal else []) + tumors
-
-
-rule multiqc:
-    input:
-        [
-            f"results/qc/fastqc/{run}/{sample}_fastqc.html"
-            for run in runs_dict
-            for sample in get_all_samples_for_run(run)
-        ],
-        [
-            f"results/qc/fastp/{run}/{sample}_fastp.html"
-            for run in runs_dict
-            for sample in get_all_samples_for_run(run)
-        ],
-        [
-            f"results/metrics/{run}_{sample}.mosdepth.summary.txt"
-            for run in runs_dict
-            for sample in get_all_samples_for_run(run)
-        ],
-        [
-            f"results/metrics/{run}_{sample}.mosdepth.region.dist.txt"
-            for run in runs_dict
-            for sample in get_all_samples_for_run(run)
-        ],
-        [
-            f"results/metrics/{run}_{sample}.recal_data.table"
-            for run in runs_dict
-            for sample in get_all_samples_for_run(run)
-        ],
-        [
-            f"results/metrics/dupl_metrics_{run}_{sample}.txt"
-            for run in runs_dict
-            for sample in get_all_samples_for_run(run)
-        ],
-    output:
-        "results/qc/multiqc_report.html",
-    conda:
-        "../envs/qc.yaml"
-    shell:
-        "multiqc results/ work/logs/ -o results/qc/ --force"

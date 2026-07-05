@@ -29,8 +29,8 @@ rule run_xengsort:
     input:
         index_info="work/refs/xengsort/xengsort-index.info",
         index_hash="work/refs/xengsort/xengsort-index.hash",
-        fq1="work/fastq/{run}/{sample}/{sample}.trimmed.1.fq.gz",
-        fq2="work/fastq/{run}/{sample}/{sample}.trimmed.2.fq.gz",
+        fq1="work/fastq/{run}/{sample}/{sample}_R1.fq.gz",
+        fq2="work/fastq/{run}/{sample}/{sample}_R2.fq.gz",
     output:
         graft1=temp("work/fastq/{run}/{sample}/{sample}.xengsort-graft.1.fq.gz"),
         graft2=temp("work/fastq/{run}/{sample}/{sample}.xengsort-graft.2.fq.gz"),

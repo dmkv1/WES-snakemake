@@ -50,7 +50,7 @@ rule cnvkit_coverage_and_fix:
         prefix="work/cnvkit/{run}/{sample}/{sample}",
     threads: config["resources"]["threads"]
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_coverage_fix_{run}_{sample}.log",
     shell:
@@ -119,7 +119,7 @@ rule gatk_haplotypecaller:
     log:
         "work/logs/HaplotypeCaller_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -261,7 +261,7 @@ rule cnvkit_segment:
         vcf_arg=lambda w: f"-v work/cnvkit/{w.run}/{w.sample}/{w.sample}.hetsnp.vcf" if not is_tumor_only(w) else "",
         normal_arg=lambda w: f"-n {runs_dict[w.run]['normal']}" if not is_tumor_only(w) else "",
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_segment_{run}_{sample}.log",
     shell:
@@ -283,7 +283,7 @@ rule cnvkit_segmetrics:
     output:
         cns="work/cnvkit/{run}/{sample}/{sample}.segmetrics.cns",
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_segmetrics_{run}_{sample}.log",
     shell:
@@ -302,7 +302,7 @@ rule cnvkit_filter_ci:
     output:
         cns="work/cnvkit/{run}/{sample}/{sample}.ci_filtered.cns",
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_filter_ci_{run}_{sample}.log",
     shell:
@@ -326,7 +326,7 @@ rule cnvkit_add_ttest:
     output:
         cns="work/cnvkit/{run}/{sample}/{sample}.ttest.cns",
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_ttest_{run}_{sample}.log",
     shell:
@@ -354,7 +354,7 @@ rule cnvkit_call:
         vcf_arg=lambda w: f"-v work/cnvkit/{w.run}/{w.sample}/{w.sample}.hetsnp.vcf" if not is_tumor_only(w) else "",
         normal_arg=lambda w: f"-n {runs_dict[w.run]['normal']}" if not is_tumor_only(w) else "",
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_call_{run}_{sample}.log",
     shell:
@@ -388,7 +388,7 @@ rule cnvkit_plots:
         vcf_arg=lambda w: f"-v work/cnvkit/{w.run}/{w.sample}/{w.sample}.hetsnp.vcf" if not is_tumor_only(w) else "",
         normal_arg=lambda w: f"-n {runs_dict[w.run]['normal']}" if not is_tumor_only(w) else "",
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_plots_{run}_{sample}.log",
     shell:

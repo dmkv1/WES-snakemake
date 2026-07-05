@@ -1,7 +1,7 @@
 rule index_bed:
     input:
         bed=lambda wildcards: config["probe_configs"][wildcards.probe_version][
-            "regions_bedfile"
+            "covered_bedfile"
         ],
     output:
         bed="work/refs/regions/{probe_version}/regions.bed",

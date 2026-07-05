@@ -16,7 +16,7 @@ rule cnvkit_export_seg:
     output:
         seg="work/purecn/{run}/{sample}/{sample}.seg",
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_export_seg_{run}_{sample}.log",
     shell:
@@ -81,7 +81,7 @@ rule cnvkit_call_with_purity:
         sample_sex=lambda w: get_sample_sex(w),
         male_reference=lambda w: is_male_reference(w),
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_call_purity_{run}_{sample}.log",
     run:
@@ -123,7 +123,7 @@ rule cnvkit_plots_calibrated:
         normal=get_normal_sample_name,
         tumor=lambda w: w.sample,
     container:
-        "docker://etal/cnvkit:0.9.11"
+        config["containers"]["cnvkit"]
     log:
         "work/logs/cnvkit_plots_calibrated_{run}_{sample}.log",
     shell:

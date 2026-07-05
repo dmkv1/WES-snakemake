@@ -34,7 +34,7 @@ rule run_mutect2:
     log:
         "work/logs/Mutect2_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -66,7 +66,7 @@ rule learn_read_orientation_model:
     log:
         "work/logs/LearnReadOrientationModel_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -96,7 +96,7 @@ rule get_pileup_summaries:
     log:
         "work/logs/GetPileupSummaries_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -139,7 +139,7 @@ rule calculate_contamination:
     log:
         "work/logs/CalculateContamination_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -174,7 +174,7 @@ rule filter_mutect2_calls:
     log:
         "work/logs/FilterMutectCalls_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
@@ -255,7 +255,7 @@ rule funcotator:
     log:
         "work/logs/Funcotator_{run}_{sample}.log",
     container:
-        "docker://broadinstitute/gatk:4.6.1.0"
+        config["containers"]["gatk"]
     shell:
         """
         gatk \
