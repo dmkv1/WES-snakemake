@@ -4,13 +4,26 @@ from typing import Dict
 
 # Getter functions
 def get_fastq1(wildcards):
-    run = wildcards.run
-    return fastq_dict[run][wildcards.sample]["fq1"]
+    return fastq_dict[wildcards.run][wildcards.sample]["fq"][wildcards.lane]["fq1"]
 
 
 def get_fastq2(wildcards):
-    run = wildcards.run
-    return fastq_dict[run][wildcards.sample]["fq2"]
+    return fastq_dict[wildcards.run][wildcards.sample]["fq"][wildcards.lane]["fq2"]
+
+
+def get_lanes(run, sample):
+    """Ordered lane tokens for a sample (['L001', 'L002', ...])."""
+    return fastq_dict[run][sample]["lanes"]
+
+
+def get_lane_bams(wildcards):
+    """Per-lane coordinate-sorted BAMs gathered by MarkDuplicates."""
+    lanes = fastq_dict[wildcards.run][wildcards.sample]["lanes"]
+    return [
+        f"results/{wildcards.run}/{wildcards.sample}/bam/lanes/"
+        f"{wildcards.sample}.{lane}.sorted.bam"
+        for lane in lanes
+    ]
 
 
 def get_tumor_bams(wildcards):
@@ -75,35 +88,38 @@ def get_purity_ploidy_args(wildcards, input):
     return f"--purity {row['purity']} --ploidy {row['ploidy']}"
 
 
-def parse_fastq_header(fastq_path: str, sample_name: str) -> Dict[str, str]:
-    # Read first line of the FASTQ file
+def get_lane_read_group(wildcards) -> str:
+    """Build a per-lane bwa '-R' @RG line from the lane's FASTQ header.
+
+    Illumina header: @instrument:run:flowcell:lane:tile:x:y ...
+    ID/PU are flowcell.lane (unique per lane -> no collision across lanes of a
+    multi-lane sample, TODO #15). LB is per-sample (lanes share one library, so
+    MarkDuplicates still detects cross-lane PCR duplicates). Tabs are the literal
+    two-character escape '\\t': bwa's -R parser requires escaped tabs and rejects
+    real <tab> characters, expanding '\\t' to tabs itself.
+    """
+    fq1 = fastq_dict[wildcards.run][wildcards.sample]["fq"][wildcards.lane]["fq1"]
     with (
-        gzip.open(fastq_path, "rt")
-        if fastq_path.endswith(".gz")
-        else open(fastq_path, "r")
+        gzip.open(fq1, "rt") if str(fq1).endswith(".gz") else open(fq1, "r")
     ) as f:
         header = f.readline().strip()
 
-    # Parse the instrument string (part before the space)
     try:
         parts = header.lstrip("@").split()[0].split(":")
-        rgid = f"{parts[0]}:{parts[1]}"
-        platform_unit = parts[2]
-    except (IndexError, AttributeError):
-        raise ValueError(f"Could not parse header in {fastq_path}: {header}")
+        flowcell, lane = parts[2], parts[3]
+    except IndexError:
+        raise ValueError(f"Could not parse flowcell/lane from header in {fq1}: {header}")
 
-    return {
-        "RGID": rgid,
-        "RGPU": platform_unit,
-        "RGSM": sample_name,
-        "RGPL": "ILLUMINA",
-        "RGLB": f"{sample_name}_{get_library_prep_for_sample(sample_name)}",
-    }
-
-
-def get_read_group_params(wildcards) -> Dict[str, str]:
-    fq1_path = fastq_dict[wildcards.run][wildcards.sample]["fq1"]
-    return parse_fastq_header(fq1_path, wildcards.sample)
+    sample = wildcards.sample
+    library = f"{sample}_{get_library_prep_for_sample(sample)}"
+    fields = [
+        f"ID:{flowcell}.{lane}",
+        f"PU:{flowcell}.{lane}",
+        f"SM:{sample}",
+        f"LB:{library}",
+        "PL:ILLUMINA",
+    ]
+    return "@RG\\t" + "\\t".join(fields)
 
 
 def is_tumor_only(wildcards):

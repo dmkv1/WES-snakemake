@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import re
+import glob
 
 
 configfile: "config.yaml"
@@ -31,17 +32,32 @@ if not invalid_gender.empty:
         f"Invalid gender values found. Must be 'f' or 'm':\n{invalid_samples}"
     )
 
-# Validate fastq files exist
-missing_files = []
-for _, row in samples.iterrows():
-    for fq_col in ["fq1", "fq2"]:
-        fq_path = row[fq_col]
-        if pd.notna(fq_path) and not os.path.exists(fq_path):
-            missing_files.append(f"  {row['ID']}/{row['sample']}: {fq_path}")
-if missing_files:
-    raise FileNotFoundError(
-        f"FASTQ files not found:\n" + "\n".join(missing_files)
-    )
+# Expand each sample's fq1/fq2 into an ordered per-lane list. The samplesheet
+# columns may be a glob (e.g. ..._L*_R1_001.fastq.gz) for multi-lane samples;
+# a plain path is just a glob that matches exactly one file, so single-lane and
+# externally-merged rows keep working unchanged. Lane tokens (L001, L002, ...)
+# are taken from the filename's _L\d\d\d_ field when present, else assigned by
+# sorted position; the true flowcell:lane for the read group is read from each
+# lane's FASTQ header at rule runtime (see common.get_lane_read_group).
+def _expand_lane_fastqs(fq1_glob, fq2_glob, ident):
+    fq1s = sorted(glob.glob(str(fq1_glob)))
+    fq2s = sorted(glob.glob(str(fq2_glob)))
+    if not fq1s:
+        raise FileNotFoundError(f"{ident}: fq1 pattern matched no files: {fq1_glob}")
+    if len(fq1s) != len(fq2s):
+        raise ValueError(
+            f"{ident}: R1/R2 lane count mismatch ({len(fq1s)} vs {len(fq2s)}) "
+            f"for patterns {fq1_glob} / {fq2_glob}"
+        )
+    tokens = []
+    for f in fq1s:
+        m = re.search(r"_L(\d{3})_", os.path.basename(f))
+        tokens.append(f"L{int(m.group(1)):03d}" if m else None)
+    if None in tokens or len(set(tokens)) != len(fq1s):
+        # filename lanes missing or non-unique -> fall back to positional tokens
+        tokens = [f"L{i:03d}" for i in range(1, len(fq1s) + 1)]
+    lanes = {tok: {"fq1": f1, "fq2": f2} for tok, f1, f2 in zip(tokens, fq1s, fq2s)}
+    return tokens, lanes
 
 # Create a dictionary of runs and their samples
 # {'ID': {'normal': 'CTRL', 'tumors': ['PT', 'PDX']}}
@@ -70,16 +86,19 @@ for run in samples["ID"].unique():
     if pdx_samples:
         pdx_dict[run] = pdx_samples
 
-# Create a dictionary to store fastq paths
+# Create a dictionary to store per-lane fastq paths
+# {ID: {sample: {"lanes": ["L001", ...], "fq": {"L001": {"fq1":..,"fq2":..}}}}}
 fastq_dict = {}
+lane_dict = {}
 for _, row in samples.iterrows():
     if pd.notna(row["ID"]):
-        if row["ID"] not in fastq_dict:
-            fastq_dict[row["ID"]] = {}
-        fastq_dict[row["ID"]][row["sample"]] = {
-            "fq1": row["fq1"],
-            "fq2": row["fq2"],
+        ident = f"{row['ID']}/{row['sample']}"
+        tokens, lanes = _expand_lane_fastqs(row["fq1"], row["fq2"], ident)
+        fastq_dict.setdefault(row["ID"], {})[row["sample"]] = {
+            "lanes": tokens,
+            "fq": lanes,
         }
+        lane_dict.setdefault(row["ID"], {})[row["sample"]] = tokens
 
 # Create probe configuration dictionary
 probe_dict = {}
@@ -119,6 +138,7 @@ for run, data in runs_dict.items():
 wildcard_constraints:
     run="[^/._]+",  # Match anything except slashes, dots and underscores
     sample="[^/.]+",  # Match anything except slashes and dots
+    lane="L[0-9]+",  # Lane token (L001, L002, ...); '.' separates it from sample
 
 
 # Import helper functions
@@ -129,6 +149,7 @@ import sys
 import workflow.scripts.common as common
 
 common.fastq_dict = fastq_dict
+common.lane_dict = lane_dict
 common.runs_dict = runs_dict
 common.pdx_dict = pdx_dict
 common.probe_dict = probe_dict

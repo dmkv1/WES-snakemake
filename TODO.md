@@ -10,7 +10,7 @@
 
 ## Multi-lane (parked — branch `multi-lane`)
 
-15. **Read group `RGID`/`RGPU` parsing fragile** — encodes only instrument:flowcell, not lane; RGIDs can collide for multi-lane samples. *(Multi-lane fix attempted, broke on RG-string parsing/bwa `-R` escaping — parked on branch `multi-lane`, not resolved here.)*
+15. **Read group `RGID`/`RGPU` parsing fragile** — encodes only instrument:flowcell, not lane; RGIDs can collide for multi-lane samples. **In progress on this branch, not working.** Design: alignment is per lane — `fastp` → `bwa mem -Y -R'@RG…' | samtools sort` runs once per lane, and `MarkDuplicates` gathers the per-lane BAMs (shared `LB`, so cross-lane PCR dups are still caught). The read group is built inline from each lane's FASTQ header (`common.get_lane_read_group`) with `ID=PU=flowcell.lane`, unique per lane. Samplesheet `fq1`/`fq2` may be a glob (`..._L*_R1_001.fastq.gz`); a plain path is a one-file glob, so existing single-file/externally-merged rows are unchanged. Removes the now-redundant `AddOrReplaceReadGroups` (RG inline in bwa) and `FixMateInformation` (coord-sort moved into the bwa pipe). **Blocker:** RG-string parsing / bwa `-R` escaping keeps breaking under different FASTQ header formats. Note for when it lands: existing single-lane BAMs change slightly vs the old chain (new RG scheme, dropped fixmate) — needs a dev-cohort re-run to validate, not retro-applied.
 
 ---
 

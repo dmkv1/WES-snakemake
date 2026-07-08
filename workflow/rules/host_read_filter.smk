@@ -29,21 +29,21 @@ rule run_xengsort:
     input:
         index_info="work/refs/xengsort/xengsort-index.info",
         index_hash="work/refs/xengsort/xengsort-index.hash",
-        fq1="work/fastq/{run}/{sample}/{sample}_R1.fq.gz",
-        fq2="work/fastq/{run}/{sample}/{sample}_R2.fq.gz",
+        fq1="work/fastq/{run}/{sample}/{sample}.{lane}_R1.fq.gz",
+        fq2="work/fastq/{run}/{sample}/{sample}.{lane}_R2.fq.gz",
     output:
-        graft1=temp("work/fastq/{run}/{sample}/{sample}.xengsort-graft.1.fq.gz"),
-        graft2=temp("work/fastq/{run}/{sample}/{sample}.xengsort-graft.2.fq.gz"),
+        graft1=temp("work/fastq/{run}/{sample}/{sample}.{lane}.xengsort-graft.1.fq.gz"),
+        graft2=temp("work/fastq/{run}/{sample}/{sample}.{lane}.xengsort-graft.2.fq.gz"),
     params:
         index="work/refs/xengsort/xengsort-index",
-        outprefix="work/fastq/{run}/{sample}/{sample}.xengsort",
+        outprefix="work/fastq/{run}/{sample}/{sample}.{lane}.xengsort",
         chunksize=config["params"]["xengsort"]["chunksize"],
         prefetch=config["params"]["xengsort"]["prefetch"],
     conda:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
     log:
-        "work/logs/xengsort_{run}_{sample}.log",
+        "work/logs/xengsort_{run}_{sample}.{lane}.log",
     shell:
         """
         xengsort classify --out {params.outprefix} \
@@ -53,7 +53,8 @@ rule run_xengsort:
             --chunksize {params.chunksize} \
             --prefetchlevel {params.prefetch} &> {log}
         # MultiQC's xengsort module names the report row after the --out path printed in
-        # this log, not the log filename; rewrite it to the bare sample name so the row
-        # merges with the sample's other QC data instead of appearing on its own.
-        sed -i "s#{params.outprefix}#{wildcards.sample}#g" {log}
+        # this log, not the log filename; rewrite it to {sample}.{lane} so the row merges
+        # with that lane's fastp/fastqc data instead of appearing on its own (and so the
+        # lanes of a multi-lane PDX sample don't collide on one name).
+        sed -i "s#{params.outprefix}#{wildcards.sample}.{wildcards.lane}#g" {log}
         """
