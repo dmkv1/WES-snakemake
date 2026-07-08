@@ -1,11 +1,24 @@
 import pandas as pd
 import os
+import re
 
 
 configfile: "config.yaml"
 
 
 samples = pd.read_csv(config["samplesheet"])
+
+# Run IDs feed the `{run}_{sample}` file-naming scheme (metrics, logs). An ID
+# containing '_', '.' or '/' would make that split ambiguous, so reject it up
+# front with a clear error instead of failing silently downstream.
+bad_ids = sorted(
+    {str(x) for x in samples["ID"].dropna().unique() if re.search(r"[_./]", str(x))}
+)
+if bad_ids:
+    raise ValueError(
+        "Run ID(s) contain '_', '.' or '/', which collide with the "
+        f"'{{run}}_{{sample}}' file naming: {', '.join(bad_ids)}"
+    )
 
 valid_sex_values = {"XX", "XY"}
 invalid_sex = samples[~samples["Chr_sex"].isin(valid_sex_values) & samples["Chr_sex"].notna()]

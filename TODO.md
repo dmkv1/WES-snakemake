@@ -24,9 +24,9 @@
 
 8. **xengsort mouse-read stats not captured** — fraction of murine reads is critical QC for PDX samples and is currently lost.
 
-9. **`MarkDuplicates` no-index intermediate, no `--intervals` in `BaseRecalibrator`** — minor sort-order inefficiency in the BWA→GATK chain.
+9. ~~**`MarkDuplicates` no-index intermediate, no `--intervals` in `BaseRecalibrator`**~~ ✅ — fixed in `bam_mapping_gatk.smk`: `mark_duplicates` now emits its `.bai` inline (`--CREATE_INDEX true`), and `create_base_recalibration` restricts `BaseRecalibrator` to the kit's capture BED (`covered_bedfile`) with `--interval-padding` (new `params.bqsr.interval_padding: 100`) instead of scanning the whole genome.
 
-10. **FastQC runs on post-BQSR BAM** — recalibrated quality scores make FastQC plots meaningless for detecting sequencing chemistry problems. Should run on raw or trimmed FASTQs.
+10. ~~**FastQC runs on post-BQSR BAM**~~ ✅ — fixed: `fastqc` moved to new `qc.smk` and now runs on the trimmed FASTQs (`{sample}_R1/R2.fq.gz`, output of `fastp_trim`) instead of the recalibrated BAM, so its chemistry plots reflect actual sequencing quality rather than GATK-rewritten scores.
 
 11. ~~**Population AF filtering uses Mutect2's germline prior VCF**~~ ✅ — investigated, **sound and authority-aligned, not a defect**. Tumour-only filtering = PON (`run_mutect2`) + population-AF hard filter (`filter_population_af`, AF>0.001), the standard strategy used by the Chapuy group. The explicit filter is *additive, not redundant*: without a matched normal, `FilterMutectCalls`' germline filter is weak. The resource is gnomAD-derived `af-only-gnomad` rather than the cited 1000G — a deliberate, defensible substitution (gnomAD is far deeper; ≥ as thorough at the 0.001 cutoff). Known marginal limitation, consciously not fixed: gnomAD is blood-derived, so `AF>0.001` can drop bona-fide CH/recurrent-somatic drivers (`DNMT3A`, `JAK2 V617F`, …) in tumour-only mode. A cancerhotspots/COSMIC allele-exemption would address it but requires an off-DAG, hg19→hg38-liftover resource the user must hand-build — friction not worth the marginal gain; documented here rather than implemented.
 
@@ -38,11 +38,11 @@
 
 13. **No orthogonal purity/ploidy estimator (FACETS)** — purity is currently a hardcoded samplesheet constant (CTRL=0, tumors=1); PureCN is the only estimator and its quality is gated by the BAF/het-SNP track (#6, #12). Add **FACETS** (WES tumor/normal, allele-specific CN + purity/ploidy from depth-ratio + BAF) as a second, orthogonal estimator so purity can be reported as a "two methods agree" number rather than an assumption. Cheap interim cross-check available with no new tool: `2 × modal VAF of clonal PASS SNVs in CN-neutral CNVkit segments ≈ purity` (Mutect2 VCF + CNVkit `.cns`, both already produced).
 
-14. **`wildcard_constraints` blocks underscores in run IDs** — silent breakage if any samplesheet `ID` contains `_`.
+14. ~~**`wildcard_constraints` blocks underscores in run IDs**~~ ✅ — the `{run}` constraint still forbids `_`/`.`/`/` (they collide with the pervasive `{run}_{sample}` filename scheme; full support would mean renaming that everywhere for no current benefit — no ID uses them). Converted the silent breakage into a loud early error: the Snakefile now validates every `ID` and raises with the offending value(s) before any DAG is built.
 
-15. **Read group `RGID`/`RGPU` parsing fragile** — encodes only instrument:flowcell, not lane; RGIDs can collide for multi-lane samples.
+15. **Read group `RGID`/`RGPU` parsing fragile** — encodes only instrument:flowcell, not lane; RGIDs can collide for multi-lane samples. *(Multi-lane fix attempted, broke on RG-string parsing/bwa `-R` escaping — parked on branch `multi-lane`, not resolved here.)*
 
-16. **`CollectHsMetrics` missing** — no capture efficiency, on-target rate, or fold-enrichment in MultiQC.
+16. ~~**`CollectHsMetrics` missing**~~ ✅ — fixed: new `collect_hs_metrics` rule in `qc.smk` runs on the final recalibrated BAM against bait/target interval lists (new `bed_to_interval_list` rule, converting the kit's `covered_bedfile`/`target_regions_bedfile` split added to `probe_configs`). `multiqc` now depends on the parsed metric files (fastp json, fastqc zip, Picard metrics, mosdepth summary, hs_metrics) rather than rendered HTML, driven by a new `multiqc_config.yaml`.
 
 17. ~~**CNVkit and Mutect2 PON reference construction not in Snakemake**~~ ✅ — done, realized as the standalone **`../WES-PON-smk`** pipeline. Both reference-building workflows (which consume the same input — all normal BAMs, per capture kit) are unified there: `alignment`/`bqsr`/`coverage`/`qc` on the normals, then (1) `cnvkit_access` + `cnvkit_autobin` (with refFlat annotation, see #18), (2) `cnvkit_coverage` per normal per kit, (3) `cnvkit_reference` per kit/sex → replaces CNVkit-nf; (4) `genomicsdb_import` + `create_somatic_pon` → replaces the old Mutect2 PON pipeline. Adding a normal triggers a single re-run of `WES-PON-smk` to update all references. (Note: the old concern that `.cnn` gene labels carry the ENST bug is moot — they are now built with `--annotate refFlat`; and even before, `.cnn` labels are metadata only, `cnvkit.py fix` uses depth values.)
 
