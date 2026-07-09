@@ -98,7 +98,7 @@ for run, data in runs_dict.items():
     if data["normal"] is None:
         for sample in data["tumors"]:
             probe = probe_dict[run][sample]
-            if probe not in config.get("tumor_only", {}).get("pon", {}):
+            if probe not in config.get("panel_of_normals", {}).get("mutect2", {}):
                 raise ValueError(f"No PON configured for probe '{probe}' (tumor-only run '{run}')")
 
 

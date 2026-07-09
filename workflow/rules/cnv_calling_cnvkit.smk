@@ -6,7 +6,7 @@ def get_cnvkit_reference(wildcards):
     chr_sex = sample_row["Chr_sex"].iloc[0]
 
     ref_key = "cnvkit_ref_m" if chr_sex == "XY" else "cnvkit_ref_f"
-    return config["probe_configs"][probe_version][ref_key]
+    return config["panel_of_normals"]["cnvkit"][ref_key][probe_version]
 
 
 def get_normal_sample_name(wildcards):
@@ -29,8 +29,7 @@ def get_sample_sex(wildcards):
 
 
 def is_male_reference(wildcards):
-    ref_path = get_cnvkit_reference(wildcards)
-    return "--male-reference" if "_male.cnn" in ref_path or "ref_m" in ref_path else ""
+    return "--male-reference" if get_sample_sex(wildcards) == "male" else ""
 
 
 rule cnvkit_coverage_and_fix:

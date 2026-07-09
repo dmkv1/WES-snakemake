@@ -71,4 +71,4 @@ def is_tumor_only(wildcards):
 def get_pon_path(wildcards):
     """Get PON VCF path for tumor-only samples"""
     probe = probe_dict[wildcards.run][wildcards.sample]
-    return config["tumor_only"]["pon"][probe]
+    return config["panel_of_normals"]["mutect2"][probe]
