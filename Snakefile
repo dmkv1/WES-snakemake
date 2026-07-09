@@ -164,7 +164,7 @@ rule all:
         ],
         # Combined data bundle for downstream analysis (Wesseract etc.)
         "results/combined/combined_data.rds",
-        # SNV/Indel VCFs (Mutect2)
+        # SNV/Indel VCFs (Mutect2 + VEP)
         [
             f"results/{run}/{sample}/{sample}.SNV.vcf"
             for run in runs_dict

@@ -7,6 +7,7 @@ run_id: "BL"            # Human-readable label prepended to Telegram notificatio
 containers:
   gatk: "docker://broadinstitute/gatk:4.6.2.0"
   cnvkit: "docker://etal/cnvkit:0.9.13"
+  vep: "docker://ensemblorg/ensembl-vep:release_116.0"
 
 # Each probe type points at the original Agilent kit BED files (header lines and
 # all; GATK tools and mosdepth skip browser/track, index_bed strips them):
@@ -45,10 +46,13 @@ refs:
   germline_resource: "/mnt/data/NGS/refs/gatk-BP-somatic-hg38/af-only-gnomad.hg38.vcf.gz"
   ## Contamination (GetPileupSummaries / CalculateContamination)
   contamination_resource: "/mnt/data/NGS/refs/gatk-BP-somatic-hg38/small_exac_common_3.hg38.vcf.gz"
-  ## Funcotator
-  funcotator_data_sources: 
-    genome_version: "hg38"
-    path: "/mnt/data/NGS/refs/funcotator/funcotator_dataSources.v1.8.hg38.20230908s"
+  ## VEP cache (INSTALL.pl --CACHEDIR is the parent dir; VEP resolves
+  ## <dir_cache>/<species>/<cache_version>_<assembly> itself)
+  vep_cache:
+    dir: "/mnt/data/NGS/refs/vep_cache/GRCh38"
+    species: "homo_sapiens"
+    assembly: "GRCh38"
+    cache_version: 116
   ## Predownloaded AnnotSV cache
   annotsv_annotations:
     genome_build: "GRCh38"

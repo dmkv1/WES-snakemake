@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-# Parse SNV vcf from Mutect2+Funcotator (GATK 4.5.0.0-4.6.1.0)
+# Parse SNV vcf from Mutect2+VEP
 suppressPackageStartupMessages({
   library(tidyverse)
   library(openxlsx)
@@ -8,38 +8,41 @@ suppressPackageStartupMessages({
   library(GenomicRanges)
 })
 
-extractFUNCOTATION <-
+# VEP's --pick keeps exactly one (MANE Select-preferred) transcript
+# annotation per allele in CSQ, so no per-transcript fan-out here.
+extractCSQ <-
   function(vcf,
            fields = c()) {
     annotation_colnames <-
-      info(vcf@metadata$header)["FUNCOTATION", "Description"] %>%
-      stringr::str_remove("Functional annotation from the Funcotator tool.  Funcotation fields are: ") %>%
+      info(vcf@metadata$header)["CSQ", "Description"] %>%
+      stringr::str_split(pattern = "Format: ") %>%
+      purrr::pluck(1, 2) %>%
       stringr::str_split(pattern = "\\|") %>%
       unlist()
-    
+
     if (length(fields) == 0) {
       fields <- annotation_colnames
     }
-    
-    as.data.frame(info(vcf)[["FUNCOTATION"]]) %>%
-      dplyr::select("FUNCOTATION" = value) %>%
-      dplyr::mutate(
-        FUNCOTATION = word(FUNCOTATION, 1, sep = "\\]"),
-        FUNCOTATION = str_remove_all(FUNCOTATION, "[\\[\\]]")
-      ) %>%
-      tidyr::separate(FUNCOTATION,
+
+    csq_first <- vapply(
+      info(vcf)[["CSQ"]],
+      function(x) if (length(x) == 0) NA_character_ else x[1],
+      character(1)
+    )
+
+    tibble(CSQ = csq_first) %>%
+      tidyr::separate(CSQ,
                       into = annotation_colnames,
                       sep = "\\|",
                       fill = "right") %>%
       dplyr::select(all_of(fields))
   }
 
+# VEP percent-encodes reserved delimiter characters (e.g. "%3D" for "=")
+# inside free-text CSQ subfields.
 decode_url <- function(x) {
-  if(is.character(x)) {
-    x <- gsub("_%20_", " ", x)
-    x <- gsub("_%2C_", ",", x)
-    x <- gsub("_%7C_", "|", x)
-    return(x)
+  if (is.character(x)) {
+    return(vapply(x, function(v) if (is.na(v)) v else utils::URLdecode(v), character(1)))
   } else {
     return(x)
   }
@@ -124,9 +127,9 @@ if (length(vcf) == 0) {
     mutate(across(everything(), ~ sapply(., function(x) x[2]))) %>%
     setNames(paste0("AD_ALT_", geno_roles))
 
-  funcotation <- extractFUNCOTATION(vcf)
+  csq <- extractCSQ(vcf)
 
-  result <- cbind(filter.df, gt.df, ad_ref.df, ad_alt.df, af.df, dp.df, funcotation) %>%
+  result <- cbind(filter.df, gt.df, ad_ref.df, ad_alt.df, af.df, dp.df, csq) %>%
     rownames_to_column("Variant") %>%
     mutate(Position = word(Variant, 1, sep = "_"),
            .before = "Variant") %>%
@@ -251,19 +254,19 @@ if (length(vcf) == 0) {
       matches("^AF_"), matches("^GT_"), matches("^DP_"), matches("^AD_"),
       # Copy number & clonality
       normal_cn, tumor_cn, tumor_cn1, tumor_cn2, expected_mutant_copies, CCF,
-      # Gene annotation
-      starts_with("Gencode_"),
+      # Gene / consequence (VEP CSQ, --pick'd transcript)
+      any_of(c(
+        "SYMBOL", "Gene", "Consequence", "IMPACT", "BIOTYPE", "Feature",
+        "HGVSc", "HGVSp", "Protein_position", "Amino_acids",
+        "CANONICAL", "MANE", "MANE_SELECT"
+      )),
       # Population frequencies
-      starts_with("gnomAD_exome_"), starts_with("gnomAD_genome_"),
+      any_of(c("AF", "MAX_AF", "MAX_AF_POPS")),
+      starts_with("gnomADe_"), starts_with("gnomADg_"),
       # Clinical & somatic databases
-      starts_with("ClinVar_VCF_"),
-      starts_with("Cosmic_"), starts_with("CosmicFusion_"), starts_with("CosmicTissue_"),
-      # Gene info & other references
-      starts_with("HGNC_"),
-      starts_with("Familial_"), starts_with("Achilles_"),
-      starts_with("Oreganno_"), starts_with("Simple_Uniprot_"),
-      # dbSNP (many flag columns, at end)
-      starts_with("dbSNP_"),
+      any_of(c("Existing_variation", "CLIN_SIG", "SOMATIC", "PHENO", "PUBMED")),
+      # Functional predictions
+      any_of(c("SIFT", "PolyPhen")),
       # Catch-all for any future additions
       everything()
     )

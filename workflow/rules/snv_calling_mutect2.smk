@@ -238,34 +238,42 @@ rule filter_population_af:
         """
 
 
-rule funcotator:
+rule vep:
     input:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.af_filtered.vcf",
         refg=config["refs"]["genome_human"],
     output:
         vcf="results/{run}/{sample}/{sample}.SNV.vcf",
-        idx="results/{run}/{sample}/{sample}.SNV.vcf.idx",
     params:
-        genome_ver=config["refs"]["funcotator_data_sources"]["genome_version"],
-        data_sources=config["refs"]["funcotator_data_sources"]["path"],
+        # dir_cache is the INSTALL.pl --CACHEDIR; VEP appends
+        # <species>/<cache_version>_<assembly> itself.
+        cache_dir=config["refs"]["vep_cache"]["dir"],
+        species=config["refs"]["vep_cache"]["species"],
+        assembly=config["refs"]["vep_cache"]["assembly"],
+        cache_version=config["refs"]["vep_cache"]["cache_version"],
         ref_path=config["refs"]["path"],
-    threads: 8
-    resources:
-        java_max_gb=config["resources"]["java_max_gb"],
+    threads: config["resources"]["threads"]
     log:
-        "work/logs/Funcotator_{run}_{sample}.log",
+        "work/logs/VEP_{run}_{sample}.log",
     container:
-        config["containers"]["gatk"]
+        config["containers"]["vep"]
     shell:
         """
-        gatk \
-        --java-options "-Xms4G -Xmx{resources.java_max_gb}G" \
-        Funcotator \
-        --reference {input.refg} \
-        --ref-version {params.genome_ver} \
-        --data-sources-path {params.data_sources} \
-        --output-file-format VCF \
-        --variant {input.vcf} \
-        --output {output.vcf} \
+        vep \
+        --input_file {input.vcf} \
+        --output_file {output.vcf} \
+        --vcf \
+        --force_overwrite \
+        --no_stats \
+        --fork {threads} \
+        --offline \
+        --cache \
+        --dir_cache {params.cache_dir} \
+        --species {params.species} \
+        --assembly {params.assembly} \
+        --cache_version {params.cache_version} \
+        --fasta {input.refg} \
+        --everything \
+        --pick \
         > {log} 2>&1
         """
