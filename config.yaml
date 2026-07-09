@@ -55,6 +55,8 @@ refs:
     path: "/mnt/data/NGS/refs/annotsv/AnnotSV_annotations"
   purecn:
     genome: "hg38"
+  ## Somalier (sample-swap / sex QC)
+  somalier_sites: "/mnt/data/NGS/refs/somalier/sites.hg38.vcf.gz"
 
 params:
     xengsort:

@@ -127,6 +127,8 @@ rule multiqc:
             for run in runs_dict
             for sample in get_all_samples_for_run(run)
         ],
+        somalier_samples=[f"results/qc/somalier/{run}/{run}.samples.tsv" for run in runs_dict],
+        somalier_pairs=[f"results/qc/somalier/{run}/{run}.pairs.tsv" for run in runs_dict],
         config="multiqc_config.yaml",
     output:
         "results/qc/multiqc_report.html",
