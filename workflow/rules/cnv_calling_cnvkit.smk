@@ -289,7 +289,7 @@ rule cnvkit_segmetrics:
         """
         cnvkit.py segmetrics {input.cnr} \
             -s {input.cns} \
-            --ci --alpha 0.5 --smooth-bootstrap \
+            --ci --alpha 0.5 --smooth-bootstrap 10 \
             -o {output.cns} \
             > {log} 2>&1
         """

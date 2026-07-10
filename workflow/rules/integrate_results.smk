@@ -18,65 +18,31 @@ rule combine_results:
         "../scripts/combine_results.R"
 
 
-rule combine_all_snvs:
+rule merge_results:
+    """Row-bind every sample's per-type CSVs into three cross-cohort TSVs."""
     input:
         snv_csvs=[
             f"results/{run}/{sample}/{sample}_SNVs.csv"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
-    output:
-        rds=temp("results/combined/combined_snvs.rds"),
-    params:
-        samplesheet=config["samplesheet"],
-    conda:
-        "../envs/r_vcf.yaml"
-    script:
-        "../scripts/combine_snvs.R"
-
-
-rule combine_all_svs:
-    input:
+        cnv_csvs=[
+            f"results/{run}/{sample}/{sample}_CNVs.csv"
+            for run in runs_dict
+            for sample in runs_dict[run]["tumors"]
+        ],
         sv_csvs=[
             f"results/{run}/{sample}/{sample}_SVs.csv"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
     output:
-        rds=temp("results/combined/combined_svs.rds"),
+        snv_tsv="results/combined/combined_snvs.tsv",
+        cnv_tsv="results/combined/combined_cnvs.tsv",
+        sv_tsv="results/combined/combined_svs.tsv",
     params:
         samplesheet=config["samplesheet"],
     conda:
         "../envs/r_vcf.yaml"
     script:
-        "../scripts/combine_svs.R"
-
-
-rule combine_all_cnvs:
-    input:
-        cnv_csvs=[
-            f"results/{run}/{sample}/{sample}_CNVs.csv"
-            for run in runs_dict
-            for sample in runs_dict[run]["tumors"]
-        ],
-    output:
-        rds=temp("results/combined/combined_cnvs.rds"),
-    params:
-        samplesheet=config["samplesheet"],
-    conda:
-        "../envs/r_vcf.yaml"
-    script:
-        "../scripts/combine_cnvs.R"
-
-
-rule bundle_combined_data:
-    input:
-        snv="results/combined/combined_snvs.rds",
-        cnv="results/combined/combined_cnvs.rds",
-        sv="results/combined/combined_svs.rds",
-    output:
-        rds="results/combined/combined_data.rds",
-    conda:
-        "../envs/r_vcf.yaml"
-    script:
-        "../scripts/bundle_data.R"
+        "../scripts/combine_all.R"

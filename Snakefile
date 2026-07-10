@@ -5,6 +5,9 @@ import re
 
 configfile: "config.yaml"
 
+bind_paths = ",".join([config["refs"]["path"], config["panel_of_normals"]["path"]])
+os.environ["APPTAINER_BIND"] = bind_paths
+os.environ["SINGULARITY_BIND"] = bind_paths
 
 samples = pd.read_csv(config["samplesheet"])
 
@@ -162,8 +165,10 @@ rule all:
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
-        # Combined data bundle for downstream analysis (Wesseract etc.)
-        "results/combined/combined_data.rds",
+        # Combined cross-sample tables for downstream analysis (Wesseract etc.)
+        "results/combined/combined_snvs.tsv",
+        "results/combined/combined_cnvs.tsv",
+        "results/combined/combined_svs.tsv",
         # SNV/Indel VCFs (Mutect2 + VEP)
         [
             f"results/{run}/{sample}/{sample}.SNV.vcf"

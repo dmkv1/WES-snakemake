@@ -6,7 +6,7 @@ run_id: "BL"            # Human-readable label prepended to Telegram notificatio
 # tumors are preprocessed by the identical GATK build (byte-identical BAMs).
 containers:
   gatk: "docker://broadinstitute/gatk:4.6.2.0"
-  cnvkit: "docker://etal/cnvkit:0.9.13"
+  cnvkit: "docker://etal/cnvkit:0.9.14"
   vep: "docker://ensemblorg/ensembl-vep:release_116.0"
 
 # Each probe type points at the original Agilent kit BED files (header lines and
@@ -79,6 +79,7 @@ params:
 
 # Built by ../WES-PON-smk from all current normals, per capture kit.
 panel_of_normals:
+  path: "/mnt/data/NGS/WES/PON/WES-PON-smk"
   cnvkit:
     cnvkit_ref_m:
       "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/reference_m.cnn"
