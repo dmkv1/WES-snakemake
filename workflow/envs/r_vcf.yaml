@@ -3,7 +3,7 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - r-base=4.3
-  - bioconductor-variantannotation
-  - r-tidyverse
-  - r-openxlsx
+  - r-base=4.3.3
+  - bioconductor-variantannotation=1.48.1
+  - r-tidyverse=2.0.0
+  - r-openxlsx=4.2.8
