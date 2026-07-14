@@ -1,8 +1,23 @@
+rule cap_manta_bam_quality:
+    # Manta-only input: caps base qualities before calling, does not touch the
+    # BAM used by any other rule. See TODO.md #22.
+    input:
+        bam="results/{run}/{sample}/bam/{sample}.bam",
+        bai="results/{run}/{sample}/bam/{sample}.bai",
+    output:
+        bam="work/manta/{run}/{sample}/{sample}.bqcap.bam",
+        bai="work/manta/{run}/{sample}/{sample}.bqcap.bam.bai",
+    conda:
+        "../envs/pysam.yaml"
+    script:
+        "../scripts/cap_base_quality.py"
+
+
 rule run_manta:
     input:
-        tumor=lambda w: f"results/{w.run}/{w.sample}/bam/{w.sample}.bam",
+        tumor="work/manta/{run}/{sample}/{sample}.bqcap.bam",
         normal=lambda w: (
-            f"results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam"
+            f"work/manta/{w.run}/{runs_dict[w.run]['normal']}/{runs_dict[w.run]['normal']}.bqcap.bam"
             if not is_tumor_only(w) else []
         ),
         refg=config["refs"]["genome_human"],
@@ -17,7 +32,7 @@ rule run_manta:
     params:
         res_dir="work/manta/{run}/{sample}",
         normal_arg=lambda w: (
-            f"--normalBam results/{w.run}/{runs_dict[w.run]['normal']}/bam/{runs_dict[w.run]['normal']}.bam"
+            f"--normalBam work/manta/{w.run}/{runs_dict[w.run]['normal']}/{runs_dict[w.run]['normal']}.bqcap.bam"
             if not is_tumor_only(w) else ""
         ),
         # Tumor-only outputs tumorSV.vcf.gz, paired outputs somaticSV.vcf.gz
@@ -44,9 +59,14 @@ rule run_manta:
         --jobs {resources.threads} --memGb {resources.mem_gb} \
         >> {log} 2>&1
 
-        # Rename output to consistent name regardless of mode
-        mv {params.res_dir}/results/variants/{params.sv_output_name}.vcf.gz {output.vcf_sv}
-        mv {params.res_dir}/results/variants/{params.sv_output_name}.vcf.gz.tbi {output.tbi_sv}
+        # Fold paired-BND inversion records into proper INV records (TODO.md #22)
+        convertInversion.py $(command -v samtools) {input.refg} \
+            {params.res_dir}/results/variants/{params.sv_output_name}.vcf.gz \
+            > {params.res_dir}/results/variants/{params.sv_output_name}.converted.vcf \
+            2>> {log}
+
+        bgzip -c {params.res_dir}/results/variants/{params.sv_output_name}.converted.vcf > {output.vcf_sv}
+        tabix -p vcf {output.vcf_sv}
         """
 
 
