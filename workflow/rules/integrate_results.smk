@@ -5,9 +5,9 @@ rule combine_results:
         cnv_cns="work/cnvkit/{run}/{sample}/{sample}.call.cns"
     output:
         xlsx="results/{run}/{sample}/{sample}_results.xlsx",
-        snv_csv="results/{run}/{sample}/{sample}_SNVs.csv",
-        cnv_csv="results/{run}/{sample}/{sample}_CNVs.csv",
-        sv_csv="results/{run}/{sample}/{sample}_SVs.csv",
+        snv_csv="work/combine/{run}/{sample}/{sample}_SNVs.csv",
+        cnv_csv="work/combine/{run}/{sample}/{sample}_CNVs.csv",
+        sv_csv="work/combine/{run}/{sample}/{sample}_SVs.csv",
     params:
         purity=get_purity,
         sample_sex=get_sample_sex,
@@ -22,17 +22,17 @@ rule merge_results:
     """Row-bind every sample's per-type CSVs into three cross-cohort TSVs."""
     input:
         snv_csvs=[
-            f"results/{run}/{sample}/{sample}_SNVs.csv"
+            f"work/combine/{run}/{sample}/{sample}_SNVs.csv"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
         cnv_csvs=[
-            f"results/{run}/{sample}/{sample}_CNVs.csv"
+            f"work/combine/{run}/{sample}/{sample}_CNVs.csv"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
         sv_csvs=[
-            f"results/{run}/{sample}/{sample}_SVs.csv"
+            f"work/combine/{run}/{sample}/{sample}_SVs.csv"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
