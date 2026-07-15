@@ -222,11 +222,11 @@ rule mosdepth:
             probe_dict[wildcards.run][wildcards.sample]
         ]["covered_bedfile"],
     output:
-        summary="results/metrics/{run}_{sample}.mosdepth.summary.txt",
-        region_dist="results/metrics/{run}_{sample}.mosdepth.region.dist.txt",
-        thresholds="results/metrics/{run}_{sample}.thresholds.bed.gz",
+        summary="results/metrics/{run}/{sample}.mosdepth.summary.txt",
+        region_dist="results/metrics/{run}/{sample}.mosdepth.region.dist.txt",
+        thresholds="results/metrics/{run}/{sample}.thresholds.bed.gz",
     params:
-        prefix="results/metrics/{run}_{sample}",
+        prefix="results/metrics/{run}/{sample}",
     conda:
         "../envs/qc.yaml"
     log:

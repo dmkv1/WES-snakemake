@@ -52,4 +52,8 @@ rule run_xengsort:
             --fastq {input.fq1} --pairs {input.fq2} \
             --chunksize {params.chunksize} \
             --prefetchlevel {params.prefetch} &> {log}
+        # MultiQC's xengsort module names the report row after the --out path printed in
+        # this log, not the log filename; rewrite it to the bare sample name so the row
+        # merges with the sample's other QC data instead of appearing on its own.
+        sed -i "s#{params.outprefix}#{wildcards.sample}#g" {log}
         """

@@ -118,7 +118,7 @@ rule multiqc:
             for sample in get_all_samples_for_run(run)
         ],
         mosdepth=[
-            f"results/metrics/{run}_{sample}.mosdepth.summary.txt"
+            f"results/metrics/{run}/{sample}.mosdepth.summary.txt"
             for run in runs_dict
             for sample in get_all_samples_for_run(run)
         ],
@@ -129,6 +129,13 @@ rule multiqc:
         ],
         somalier_samples=[f"results/qc/somalier/{run}/{run}.samples.tsv" for run in runs_dict],
         somalier_pairs=[f"results/qc/somalier/{run}/{run}.pairs.tsv" for run in runs_dict],
+        # forces run_xengsort to complete before multiqc; also keeps its temp() graft fastqs
+        # around until multiqc runs instead of being deleted right after bwa_map consumes them
+        xengsort_graft=[
+            f"work/fastq/{run}/{sample}/{sample}.xengsort-graft.1.fq.gz"
+            for run in runs_dict
+            for sample in pdx_dict.get(run, [])
+        ],
         config="multiqc_config.yaml",
     output:
         "results/qc/multiqc_report.html",
