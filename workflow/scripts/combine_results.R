@@ -52,9 +52,14 @@ decode_url <- function(x) {
 input_tsv_sv <- snakemake@input[["sv_tsv"]]
 input_file_vcf <- snakemake@input[["snv_vcf"]]
 input_cns_cnv <- snakemake@input[["cnv_cns"]]
-purity <- snakemake@params[["purity"]]
 sample_sex <- snakemake@params[["sample_sex"]]
 normal_name <- snakemake@params[["normal"]]
+
+# Single source of truth for purity, resolved by resolve_purity_source (see
+# purecn.smk) — the same value cnvkit_call used for --purity, so CCF math
+# here and the copy number baked into input_cns_cnv can never disagree.
+purity_info <- read_csv(snakemake@input[["purity_csv"]], show_col_types = FALSE)
+purity <- purity_info$purity[1]
 
 # Fixed paths for debugging
 # input_file_vcf <- "/home/dmitryk/Projects/WES_analysis/WES-snakemake/results/P005/P005_PT/P005_PT.SNV.vcf"
@@ -280,11 +285,18 @@ if (!exists("CNVs.df")) {
 # Parse the .tsv with the SVs from Manta
 SVs.df <- read_tsv(input_tsv_sv, show_col_types = F)
 
+# Per-sample QC row: which purity source was used, plus PureCN's raw
+# estimate for comparison even on samples where it wasn't used (see
+# resolve_purity_source in purecn.smk).
+qc_row <- purity_info %>%
+  mutate(sample_sex = sample_sex, normal = normal_name, .before = 1)
+
 # Combine and write the output
 result_list <- list(
   "SNVs" = result_snv,
   "CNVs" = CNVs.df,
-  "SVs" = SVs.df
+  "SVs" = SVs.df,
+  "Sample_QC" = qc_row
 )
 
 output_file_path <- snakemake@output[["xlsx"]]
@@ -294,3 +306,4 @@ write.xlsx(result_list, output_file_path, overwrite = TRUE)
 write_csv(result_snv, snakemake@output[["snv_csv"]])
 write_csv(CNVs.df,    snakemake@output[["cnv_csv"]])
 write_csv(SVs.df,     snakemake@output[["sv_csv"]])
+write_csv(qc_row,     snakemake@output[["qc_csv"]])

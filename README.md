@@ -56,6 +56,12 @@ By default, gnomAD_exome and gnomAD_genome are disabled in the Funcotator data s
 Other resources:
 * Exome capture regions in BED format — provided by the exome library preparation kit manufacturer.
 * AnnotSV annotations — can be downloaded using the [INSTALL_annotations shell script](https://github.com/lgmgeo/AnnotSV/blob/master/bin/INSTALL_annotations.sh).
+* PureCN SNP blacklist (`refs.purecn.snp_blacklist`) — UCSC Simple Repeats (Tandem Repeats Finder) track for hg38, passed to `PureCN.R --snp-blacklist` to exclude repeat-region variants from purity/ploidy fitting:
+  ```bash
+  wget -O simpleRepeat.txt.gz https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/simpleRepeat.txt.gz
+  zcat simpleRepeat.txt.gz | cut -f2-4 > hg38_simpleRepeats.bed   # chrom, chromStart, chromEnd (already 0-based)
+  ```
+  Stored at `/mnt/data/NGS/refs/UCSC/hg38_simpleRepeats.bed`, alongside `refFlat.txt` (same source, same directory).
 
 ## Running the Pipeline
 

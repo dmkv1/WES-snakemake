@@ -6,4 +6,4 @@ set -euo pipefail
 # Pass -n (or any extra args) through to snakemake, e.g. ./launch.sh -n
 snakemake \
     --profile profiles/default \
-    "$@" > snakemake.log 2>&1
+    "$@" 2>&1 | tee snakemake.log

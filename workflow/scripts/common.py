@@ -32,6 +32,40 @@ def get_purity(wildcards):
     return purity_dict[wildcards.run][wildcards.sample]
 
 
+def is_paired_run(run):
+    return runs_dict[run]["normal"] is not None
+
+
+def is_purecn_eligible(wildcards):
+    """Paired tumor/normal runs only (PDX included). Tumor-only runs have no
+    matched-normal het-SNP track for PureCN's BAF-based purity/ploidy fit."""
+    return is_paired_run(wildcards.run)
+
+
+def get_purecn_normaldb(wildcards):
+    probe_version = probe_dict[wildcards.run][wildcards.sample]
+    return config["panel_of_normals"]["purecn"]["normaldb"][probe_version]
+
+
+def get_purecn_mapping_bias(wildcards):
+    probe_version = probe_dict[wildcards.run][wildcards.sample]
+    return config["panel_of_normals"]["purecn"]["mapping_bias"][probe_version]
+
+
+def get_purity_ploidy_args(wildcards, input):
+    """Single source of truth for cnvkit call's --purity/--ploidy, read from
+    resolve_purity_source's sidecar so cnvkit_call and combine_results can
+    never disagree on which purity value was actually used."""
+    import csv
+
+    with open(input.purity_csv) as fh:
+        row = next(csv.DictReader(fh))
+    if row["source"] == "purecn":
+        return f"--purity {row['purity']} --ploidy {row['ploidy']}"
+    # No --ploidy -> cnvkit's own default (2), matching pre-PureCN behaviour.
+    return f"--purity {row['purity']}"
+
+
 def parse_fastq_header(fastq_path: str, sample_name: str) -> Dict[str, str]:
     # Read first line of the FASTQ file
     with (

@@ -134,6 +134,7 @@ include: "workflow/rules/somalier.smk"
 include: "workflow/rules/snv_calling_mutect2.smk"
 include: "workflow/rules/sv_calling_manta.smk"
 include: "workflow/rules/cnv_calling_cnvkit.smk"
+include: "workflow/rules/purecn.smk"
 include: "workflow/rules/integrate_results.smk"
 
 def _tg_notify(msg):
@@ -169,6 +170,7 @@ rule all:
         "results/combined/combined_snvs.tsv",
         "results/combined/combined_cnvs.tsv",
         "results/combined/combined_svs.tsv",
+        "results/combined/combined_qc.tsv",
         # SNV/Indel VCFs (Mutect2 + VEP)
         [
             f"results/{run}/{sample}/{sample}.SNV.vcf"
@@ -185,6 +187,15 @@ rule all:
             f"results/{run}/{sample}/{sample}.diagram.pdf"
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
+        ],
+        # PureCN purity/ploidy estimates — always built for paired tumors so
+        # they're available for report comparison regardless of whether
+        # params.cnv.purity_source actually uses them (see resolve_purity_source).
+        [
+            f"work/purecn/{run}/{sample}/{sample}.csv"
+            for run in runs_dict
+            for sample in runs_dict[run]["tumors"]
+            if is_paired_run(run)
         ],
         # Somalier sample-swap / sex QC report
         [f"results/qc/somalier/{run}/{run}.html" for run in runs_dict],

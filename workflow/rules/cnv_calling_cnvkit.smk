@@ -342,6 +342,7 @@ rule cnvkit_call:
     input:
         cns="work/cnvkit/{run}/{sample}/{sample}.ttest.cns",
         vcf="work/cnvkit/{run}/{sample}/{sample}.hetsnp.vcf",
+        purity_csv="work/purity/{run}/{sample}/{sample}.purity.csv",
     output:
         cns="work/cnvkit/{run}/{sample}/{sample}.call.cns",
     params:
@@ -349,7 +350,7 @@ rule cnvkit_call:
         tumor=lambda w: w.sample,
         sample_sex=get_sample_sex,
         male_reference=is_male_reference,
-        purity=get_purity,
+        purity_ploidy_args=get_purity_ploidy_args,
         vcf_arg=lambda w: f"-v work/cnvkit/{w.run}/{w.sample}/{w.sample}.hetsnp.vcf" if not is_tumor_only(w) else "",
         normal_arg=lambda w: f"-n {runs_dict[w.run]['normal']}" if not is_tumor_only(w) else "",
     container:
@@ -364,7 +365,7 @@ rule cnvkit_call:
             -i {params.tumor} \
             --sample-sex {params.sample_sex} \
             {params.male_reference} \
-            --purity {params.purity} \
+            {params.purity_ploidy_args} \
             -m clonal \
             --center median \
             --drop-low-coverage \

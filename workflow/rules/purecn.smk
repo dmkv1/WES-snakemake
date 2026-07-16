@@ -6,10 +6,6 @@ def get_sample_sex_purecn(wildcards):
     return "M" if chr_sex == "XY" else "F"
 
 
-def get_normal_sample_name(wildcards):
-    return runs_dict[wildcards.run]["normal"]
-
-
 rule cnvkit_export_seg:
     input:
         cns="work/cnvkit/{run}/{sample}/{sample}.cns",
@@ -33,6 +29,9 @@ rule purecn_run:
         vcf="work/cnvkit/{run}/{sample}/{sample}.hetsnp.vcf",
         cnr="work/cnvkit/{run}/{sample}/{sample}.filtered.cnr",
         seg="work/purecn/{run}/{sample}/{sample}.seg",
+        normaldb=get_purecn_normaldb,
+        mapping_bias=get_purecn_mapping_bias,
+        snp_blacklist=config["refs"]["purecn"]["snp_blacklist"],
     output:
         csv="work/purecn/{run}/{sample}/{sample}.csv",
         rds="work/purecn/{run}/{sample}/{sample}.rds",
@@ -51,7 +50,8 @@ rule purecn_run:
         "work/logs/purecn_{run}_{sample}.log",
     shell:
         """
-        Rscript $CONDA_PREFIX/lib/R/library/PureCN/extdata/PureCN.R \
+        PURECN_SCRIPT=$(Rscript -e 'cat(system.file("extdata", "PureCN.R", package = "PureCN"))')
+        Rscript "$PURECN_SCRIPT" \
             --out {params.out_dir} \
             --sampleid {params.sample_id} \
             --tumor {input.cnr} \
@@ -59,6 +59,9 @@ rule purecn_run:
             --seg-file {input.seg} \
             --vcf {input.vcf} \
             --genome {params.genome} \
+            --normaldb {input.normaldb} \
+            --mapping-bias-file {input.mapping_bias} \
+            --snp-blacklist {input.snp_blacklist} \
             --fun-segmentation Hclust \
             --min-base-quality 20 \
             --post-optimize \
@@ -68,81 +71,76 @@ rule purecn_run:
         """
 
 
-rule cnvkit_call_with_purity:
+rule resolve_purity_source:
+    """Single decision point for tumor purity/ploidy: PureCN (paired tumors,
+    when not Flagged and config-enabled) or the samplesheet constant
+    (tumor-only, PureCN disabled/failed-to-be-confident, or Flagged).
+    cnvkit_call and combine_results both read this sidecar rather than each
+    independently deciding, so they can never disagree on which value was
+    actually used."""
     input:
-        cns="work/cnvkit/{run}/{sample}/{sample}.ttest.cns",
-        vcf="work/cnvkit/{run}/{sample}/{sample}.hetsnp.vcf",
-        purecn_csv="work/purecn/{run}/{sample}/{sample}.csv",
+        purecn_csv=lambda w: (
+            f"work/purecn/{w.run}/{w.sample}/{w.sample}.csv"
+            if is_purecn_eligible(w) else []
+        ),
     output:
-        cns="work/cnvkit/{run}/{sample}/{sample}.purecn_calibrated.cns",
+        purity_csv="work/purity/{run}/{sample}/{sample}.purity.csv",
     params:
-        normal=get_normal_sample_name,
-        tumor=lambda w: w.sample,
-        sample_sex=lambda w: get_sample_sex(w),
-        male_reference=lambda w: is_male_reference(w),
-    container:
-        config["containers"]["cnvkit"]
+        eligible=is_purecn_eligible,
+        toggle=config["params"]["cnv"]["purity_source"],
+        sheet_purity=get_purity,
     log:
-        "work/logs/cnvkit_call_purity_{run}_{sample}.log",
+        "work/logs/resolve_purity_source_{run}_{sample}.log",
     run:
-        import pandas as pd
-        
-        # Extract purity and ploidy from PureCN
-        purecn_df = pd.read_csv(input.purecn_csv)
-        purity = purecn_df.loc[0, "Purity"]
-        ploidy = round(purecn_df.loc[0, "Ploidy"])
-        
-        purity_ploidy_arg = f"--purity {purity} --ploidy {ploidy}"
-        male_ref_arg = params.male_reference
-        
-        shell(f"""
-        cnvkit.py call {{input.cns}} \
-            -v {{input.vcf}} \
-            -n {{params.normal}} \
-            -i {{params.tumor}} \
-            --sample-sex {{params.sample_sex}} \
-            {male_ref_arg} \
-            {purity_ploidy_arg} \
-            -m clonal \
-            --center median \
-            --drop-low-coverage \
-            -o {{output.cns}} \
-            > {{log}} 2>&1
-        """)
+        import csv
+        import os
 
+        purecn_purity = purecn_ploidy = purecn_flagged = ""
+        source = "samplesheet"
 
-rule cnvkit_plots_calibrated:
-    input:
-        cnr="work/cnvkit/{run}/{sample}/{sample}.filtered.cnr",
-        cns="work/cnvkit/{run}/{sample}/{sample}.purecn_calibrated.cns",
-        vcf="work/cnvkit/{run}/{sample}/{sample}.hetsnp.vcf",
-    output:
-        scatter="results/{run}/{sample}/{sample}.scatter.calibrated.png",
-        diagram="results/{run}/{sample}/{sample}.diagram.calibrated.pdf",
-    params:
-        normal=get_normal_sample_name,
-        tumor=lambda w: w.sample,
-    container:
-        config["containers"]["cnvkit"]
-    log:
-        "work/logs/cnvkit_plots_calibrated_{run}_{sample}.log",
-    shell:
-        """
-        cnvkit.py scatter {input.cnr} \
-            -s {input.cns} \
-            -v {input.vcf} \
-            -n {params.normal} \
-            -i {params.tumor} \
-            --title "{params.tumor} (PureCN calibrated)" \
-            --y-max 4 --y-min -4 \
-            --fig-size 10 5 \
-            -o {output.scatter} \
-            > {log} 2>&1
+        if params.eligible:
+            with open(input.purecn_csv) as fh:
+                row = next(csv.DictReader(fh))
+            purecn_purity = row["Purity"]
+            purecn_ploidy = row["Ploidy"]
+            purecn_flagged = row["Flagged"]
 
-        cnvkit.py diagram {input.cnr} \
-            -s {input.cns} \
-            --no-gene-labels \
-            --title "{params.tumor} (PureCN calibrated)" \
-            -o {output.diagram} \
-            > {log} 2>&1
-        """
+            if params.toggle == "purecn":
+                is_flagged = str(purecn_flagged).strip().upper() == "TRUE"
+                has_valid_purity = purecn_purity not in ("", "NA", None)
+                if not is_flagged and has_valid_purity:
+                    source = "purecn"
+                else:
+                    source = "samplesheet_fallback_flagged"
+
+        purity = purecn_purity if source == "purecn" else params.sheet_purity
+        ploidy = purecn_ploidy if source == "purecn" else ""
+
+        os.makedirs(os.path.dirname(output.purity_csv), exist_ok=True)
+        with open(output.purity_csv, "w", newline="") as fh:
+            writer = csv.DictWriter(
+                fh,
+                fieldnames=[
+                    "run",
+                    "sample",
+                    "purity",
+                    "ploidy",
+                    "source",
+                    "purecn_purity",
+                    "purecn_ploidy",
+                    "purecn_flagged",
+                ],
+            )
+            writer.writeheader()
+            writer.writerow(
+                {
+                    "run": wildcards.run,
+                    "sample": wildcards.sample,
+                    "purity": purity,
+                    "ploidy": ploidy,
+                    "source": source,
+                    "purecn_purity": purecn_purity,
+                    "purecn_ploidy": purecn_ploidy,
+                    "purecn_flagged": purecn_flagged,
+                }
+            )

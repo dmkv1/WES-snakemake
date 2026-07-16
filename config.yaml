@@ -1,6 +1,6 @@
 samplesheet: "samplesheet.csv"
 telegram_bot_env: "~/.telegram_bot.env"  # Path to .telegram_bot.env file; leave empty to disable notifications
-run_id: "BL"            # Human-readable label prepended to Telegram notifications
+run_id: "dev test"            # Human-readable label prepended to Telegram notifications
 
 # Container images (pinned). Must match WES-PON-smk so PON normals and caller
 # tumors are preprocessed by the identical GATK build (byte-identical BAMs).
@@ -59,6 +59,9 @@ refs:
     path: "/mnt/data/NGS/refs/annotsv/AnnotSV_annotations"
   purecn:
     genome: "hg38"
+    # UCSC Simple Repeats (Tandem Repeats Finder) track, hg38. See README
+    # "Reference files" section for sourcing.
+    snp_blacklist: "/mnt/data/NGS/refs/UCSC/hg38_simpleRepeats.bed"
   ## Somalier (sample-swap / sex QC)
   somalier_sites: "/mnt/data/NGS/refs/somalier/sites.hg38.vcf.gz"
 
@@ -71,6 +74,15 @@ params:
       prefetch: 1
     cnvkit:
       filter_ci: false  # Set to true to enable segments filtering based on CI
+    cnv:
+      # "samplesheet": always use the samplesheet purity column (default,
+      #                zero behaviour change, rollback path).
+      # "purecn": use PureCN's Purity/Ploidy for paired tumors when the run
+      #           succeeded and is not Flagged; falls back to samplesheet
+      #           purity otherwise. PureCN still runs regardless of this
+      #           toggle, so its numbers are always in the report for
+      #           comparison even when unused.
+      purity_source: "samplesheet"
     fastp:
       # adds sequence-based PE adapter detection as a backstop to R1/R2 overlap analysis
       detect_adapter_for_pe: true
@@ -90,6 +102,17 @@ panel_of_normals:
   mutect2:
     "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/mutect2/SureSelectV6UTR/pon.vcf.gz"
     "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/mutect2/SureSelectV8UTR/pon.vcf.gz"
+  # TEST run, not yet the production PON location (that's under panel_of_normals.path
+  # above, i.e. /mnt/data/NGS/WES/PON/WES-PON-smk/...). Points at a scratch validation
+  # run — /mnt/scratch/DM/WES-PON-smk/results/PON/purecn/... — pending the checks below.
+  # Once validated, re-point these at the production path to match cnvkit/mutect2.
+  purecn:
+    normaldb:
+      "V6+UTR": "/mnt/scratch/DM/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/normalDB_SureSelectV6UTR_hg38.rds"
+      "V8+UTR": "/mnt/scratch/DM/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/normalDB_SureSelectV8UTR_hg38.rds"
+    mapping_bias:
+      "V6+UTR": "/mnt/scratch/DM/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_hg38.rds"
+      "V8+UTR": "/mnt/scratch/DM/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_hg38.rds"
 
 tumor_only:
   af_threshold: 0.001  # Filter variants with population AF > this

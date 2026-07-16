@@ -71,13 +71,15 @@ combine_csvs <- function(csv_files, rename_fn = identity) {
 combined_snvs <- combine_csvs(snakemake@input[["snv_csvs"]])
 combined_cnvs <- combine_csvs(snakemake@input[["cnv_csvs"]])
 combined_svs  <- combine_csvs(snakemake@input[["sv_csvs"]], rename_sv_sample_cols)
+combined_qc   <- combine_csvs(snakemake@input[["qc_csvs"]])
 
 write_tsv(combined_snvs, snakemake@output[["snv_tsv"]])
 write_tsv(combined_cnvs, snakemake@output[["cnv_tsv"]])
 write_tsv(combined_svs,  snakemake@output[["sv_tsv"]])
+write_tsv(combined_qc,   snakemake@output[["qc_tsv"]])
 
 message(sprintf(
-  "[OK] Combined %d SNV / %d CNV / %d SV rows across %d samples",
-  nrow(combined_snvs), nrow(combined_cnvs), nrow(combined_svs),
+  "[OK] Combined %d SNV / %d CNV / %d SV / %d QC rows across %d samples",
+  nrow(combined_snvs), nrow(combined_cnvs), nrow(combined_svs), nrow(combined_qc),
   length(unique(combined_snvs$sID))
 ))
