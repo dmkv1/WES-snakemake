@@ -31,6 +31,7 @@ rule run_mutect2:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
     log:
         "work/logs/Mutect2_{run}_{sample}.log",
     container:
@@ -63,6 +64,7 @@ rule learn_read_orientation_model:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
     log:
         "work/logs/LearnReadOrientationModel_{run}_{sample}.log",
     container:
@@ -93,6 +95,7 @@ rule get_pileup_summaries:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
     log:
         "work/logs/GetPileupSummaries_{run}_{sample}.log",
     container:
@@ -136,6 +139,7 @@ rule calculate_contamination:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
     log:
         "work/logs/CalculateContamination_{run}_{sample}.log",
     container:
@@ -171,6 +175,7 @@ rule filter_mutect2_calls:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
     log:
         "work/logs/FilterMutectCalls_{run}_{sample}.log",
     container:

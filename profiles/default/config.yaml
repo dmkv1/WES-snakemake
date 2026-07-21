@@ -2,3 +2,9 @@ rerun-incomplete: true
 use-conda: true
 use-singularity: true
 cores: 48
+
+default-resources:
+  mem_mb: 4000
+
+resources:
+  mem_mb: 450000

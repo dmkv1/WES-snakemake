@@ -62,6 +62,7 @@ rule add_read_groups:
         rg=get_read_group_params,
     resources:
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
         java_max_gb=config["resources"]["java_max_gb"],
     log:
         "work/logs/AddOrReplaceReadGroups_{run}_{sample}.log",
@@ -93,6 +94,7 @@ rule fix_mate_info:
         tmp_dir="tmp",
     resources:
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
         java_max_gb=config["resources"]["java_max_gb"],
     log:
         "work/logs/FixMateInformation_{run}_{sample}.log",
@@ -124,6 +126,7 @@ rule mark_duplicates:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
     log:
         "work/logs/MarkDuplicates_{run}_{sample}.log",
     container:
@@ -162,6 +165,7 @@ rule create_base_recalibration:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
     log:
         "work/logs/BaseRecalibrator_{run}_{sample}.log",
     container:
@@ -196,6 +200,7 @@ rule apply_base_recalibration:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
     log:
         "work/logs/ApplyBQSR_{run}_{sample}.log",
     container:

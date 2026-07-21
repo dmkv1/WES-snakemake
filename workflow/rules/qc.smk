@@ -34,6 +34,7 @@ rule bed_to_interval_list:
         config["containers"]["gatk"]
     resources:
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
         java_max_gb=config["resources"]["java_max_gb"],
     wildcard_constraints:
         kind="bait|target",
@@ -83,6 +84,7 @@ rule collect_hs_metrics:
         config["containers"]["gatk"]
     resources:
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
         java_max_gb=config["resources"]["java_max_gb"],
     params:
         tmp_dir="tmp",

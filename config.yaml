@@ -123,4 +123,6 @@ resources:
   threads: 16
   java_max_gb: 128
   java_min_gb: 32
+  mem_mb: 163840       # java_max_gb + 25% non-heap overhead, for scheduler mem_mb tracking
   manta_max_gb: 128
+  manta_mem_mb: 163840 # manta_max_gb + 25% overhead, for scheduler mem_mb tracking

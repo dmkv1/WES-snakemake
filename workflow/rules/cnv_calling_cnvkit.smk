@@ -115,6 +115,7 @@ rule gatk_haplotypecaller:
     resources:
         java_max_gb=config["resources"]["java_max_gb"],
         java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
     log:
         "work/logs/HaplotypeCaller_{run}_{sample}.log",
     container:

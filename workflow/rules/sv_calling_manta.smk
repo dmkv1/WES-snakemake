@@ -40,6 +40,7 @@ rule run_manta:
     resources:
         threads=config["resources"]["threads"],
         mem_gb=config["resources"]["manta_max_gb"],
+        mem_mb=config["resources"]["manta_mem_mb"],
     conda:
         "../envs/manta.yaml"
     log:
