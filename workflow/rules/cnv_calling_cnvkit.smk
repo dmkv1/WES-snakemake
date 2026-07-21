@@ -3,9 +3,9 @@ def get_cnvkit_reference(wildcards):
     sample_row = samples[
         (samples["ID"] == wildcards.run) & (samples["sample"] == wildcards.sample)
     ]
-    chr_sex = sample_row["Chr_sex"].iloc[0]
+    gender = sample_row["gender"].iloc[0]
 
-    ref_key = "cnvkit_ref_m" if chr_sex == "XY" else "cnvkit_ref_f"
+    ref_key = "cnvkit_ref_m" if gender == "m" else "cnvkit_ref_f"
     return config["panel_of_normals"]["cnvkit"][ref_key][probe_version]
 
 
@@ -24,8 +24,8 @@ def get_sample_sex(wildcards):
     sample_row = samples[
         (samples["ID"] == wildcards.run) & (samples["sample"] == wildcards.sample)
     ]
-    chr_sex = sample_row["Chr_sex"].iloc[0]
-    return "male" if chr_sex == "XY" else "female"
+    gender = sample_row["gender"].iloc[0]
+    return "male" if gender == "m" else "female"
 
 
 def is_male_reference(wildcards):

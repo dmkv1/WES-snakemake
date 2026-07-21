@@ -1,4 +1,4 @@
-samplesheet: "samplesheet.csv"
+samplesheet: "samplesheet_test.csv"
 telegram_bot_env: "~/.telegram_bot.env"  # Path to .telegram_bot.env file; leave empty to disable notifications
 run_id: "dev test"            # Human-readable label prepended to Telegram notifications
 
@@ -102,17 +102,19 @@ panel_of_normals:
   mutect2:
     "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/mutect2/SureSelectV6UTR/pon.vcf.gz"
     "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/mutect2/SureSelectV8UTR/pon.vcf.gz"
-  # TEST run, not yet the production PON location (that's under panel_of_normals.path
-  # above, i.e. /mnt/data/NGS/WES/PON/WES-PON-smk/...). Points at a scratch validation
-  # run — /mnt/scratch/DM/WES-PON-smk/results/PON/purecn/... — pending the checks below.
-  # Once validated, re-point these at the production path to match cnvkit/mutect2.
   purecn:
-    normaldb:
-      "V6+UTR": "/mnt/scratch/DM/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/normalDB_SureSelectV6UTR_hg38.rds"
-      "V8+UTR": "/mnt/scratch/DM/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/normalDB_SureSelectV8UTR_hg38.rds"
-    mapping_bias:
-      "V6+UTR": "/mnt/scratch/DM/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_hg38.rds"
-      "V8+UTR": "/mnt/scratch/DM/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_hg38.rds"
+    normaldb_m:
+      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/normalDB_SureSelectV6UTR_m_hg38.rds"
+      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/normalDB_SureSelectV8UTR_m_hg38.rds"
+    normaldb_f:
+      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/normalDB_SureSelectV6UTR_f_hg38.rds"
+      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/normalDB_SureSelectV8UTR_f_hg38.rds"
+    mapping_bias_m:
+      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_m_hg38.rds"
+      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_m_hg38.rds"
+    mapping_bias_f:
+      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_f_hg38.rds"
+      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_f_hg38.rds"
 
 tumor_only:
   af_threshold: 0.001  # Filter variants with population AF > this

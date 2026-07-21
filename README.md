@@ -72,7 +72,7 @@ Create comma-separated table `samplesheet.csv` with columns:
 * **ID**: Sample group identifier (usually a patient ID). Samples sharing an ID are processed together.
 * **sample**: Sample identifier, unique within the given ID.
 * **sample_type**: Sample type — `CTRL` for matched normal/germline, `PDX` for xenograft, any other value is treated as a tumor sample.
-* **Chr_sex**: Chromosomal sex — `XX` for female, `XY` for male.
+* **gender**: `f` for female, `m` for male.
 * **probes**: Exome library kit version. Must match a key in `probe_configs` in `config.yaml`.
 * **purity**: Known or estimated tumor cell fraction (0–1). Used for CNVkit copy number calling and CCF calculation.
 * **fq1**: Full path to R1 FASTQ file.
@@ -80,12 +80,12 @@ Create comma-separated table `samplesheet.csv` with columns:
 
 Example format:
 
-| ID   | sample   | sample_type | Chr_sex | probes | purity | fq1 | fq2 |
-|------|----------|-------------|---------|--------|--------|-----|-----|
-| Pt01 | Normal01 | CTRL        | XY      | V8+UTR | 0      | /path/to/Normal01_R1.fastq.gz | /path/to/Normal01_R2.fastq.gz |
-| Pt01 | Tumor01  | Tumor       | XY      | V8+UTR | 0.7    | /path/to/Tumor01_R1.fastq.gz  | /path/to/Tumor01_R2.fastq.gz  |
-| Pt01 | Tumor02  | Tumor       | XY      | V8+UTR | 0.3    | /path/to/Tumor02_R1.fastq.gz  | /path/to/Tumor02_R2.fastq.gz  |
-| Pt01 | Model01  | PDX         | XY      | V8+UTR | 1      | /path/to/Model01_R1.fastq.gz  | /path/to/Model01_R2.fastq.gz  |
+| ID   | sample   | sample_type | gender | probes | purity | fq1 | fq2 |
+|------|----------|-------------|--------|--------|--------|-----|-----|
+| Pt01 | Normal01 | CTRL        | m      | V8+UTR | 0      | /path/to/Normal01_R1.fastq.gz | /path/to/Normal01_R2.fastq.gz |
+| Pt01 | Tumor01  | Tumor       | m      | V8+UTR | 0.7    | /path/to/Tumor01_R1.fastq.gz  | /path/to/Tumor01_R2.fastq.gz  |
+| Pt01 | Tumor02  | Tumor       | m      | V8+UTR | 0.3    | /path/to/Tumor02_R1.fastq.gz  | /path/to/Tumor02_R2.fastq.gz  |
+| Pt01 | Model01  | PDX         | m      | V8+UTR | 1      | /path/to/Model01_R1.fastq.gz  | /path/to/Model01_R2.fastq.gz  |
 
 #### Tumor–Normal Paired Mode
 

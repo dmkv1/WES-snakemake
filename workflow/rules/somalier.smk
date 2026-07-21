@@ -28,19 +28,19 @@ rule somalier_extract:
 
 
 rule somalier_ped:
-    """Per-run PED (family=run, sex from samplesheet Chr_sex) so `somalier
-    relate` flags sex mismatches against the same Chr_sex value that drives
+    """Per-run PED (family=run, sex from samplesheet gender) so `somalier
+    relate` flags sex mismatches against the same gender value that drives
     CNVkit reference selection."""
     output:
         ped="work/somalier/{run}/{run}.ped",
     params:
         run_samples=lambda w: get_all_samples_for_run(w.run),
     run:
-        sex_code = {"XY": "1", "XX": "2"}
+        sex_code = {"m": "1", "f": "2"}
         with open(output.ped, "w") as fh:
             for sample in params.run_samples:
-                chr_sex = samples.loc[samples["sample"] == sample, "Chr_sex"].iloc[0]
-                fh.write(f"{wildcards.run}\t{sample}\t0\t0\t{sex_code.get(chr_sex, '0')}\t0\n")
+                gender = samples.loc[samples["sample"] == sample, "gender"].iloc[0]
+                fh.write(f"{wildcards.run}\t{sample}\t0\t0\t{sex_code.get(gender, '0')}\t0\n")
 
 
 rule somalier_relate:

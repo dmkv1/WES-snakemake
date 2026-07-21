@@ -42,14 +42,21 @@ def is_purecn_eligible(wildcards):
     return is_paired_run(wildcards.run)
 
 
+def _get_gender(run, sample):
+    sample_row = samples[(samples["ID"] == run) & (samples["sample"] == sample)]
+    return sample_row["gender"].iloc[0]
+
+
 def get_purecn_normaldb(wildcards):
     probe_version = probe_dict[wildcards.run][wildcards.sample]
-    return config["panel_of_normals"]["purecn"]["normaldb"][probe_version]
+    sex_key = "normaldb_m" if _get_gender(wildcards.run, wildcards.sample) == "m" else "normaldb_f"
+    return config["panel_of_normals"]["purecn"][sex_key][probe_version]
 
 
 def get_purecn_mapping_bias(wildcards):
     probe_version = probe_dict[wildcards.run][wildcards.sample]
-    return config["panel_of_normals"]["purecn"]["mapping_bias"][probe_version]
+    sex_key = "mapping_bias_m" if _get_gender(wildcards.run, wildcards.sample) == "m" else "mapping_bias_f"
+    return config["panel_of_normals"]["purecn"][sex_key][probe_version]
 
 
 def get_purity_ploidy_args(wildcards, input):

@@ -2,8 +2,8 @@ def get_sample_sex_purecn(wildcards):
     sample_row = samples[
         (samples["ID"] == wildcards.run) & (samples["sample"] == wildcards.sample)
     ]
-    chr_sex = sample_row["Chr_sex"].iloc[0]
-    return "M" if chr_sex == "XY" else "F"
+    gender = sample_row["gender"].iloc[0]
+    return "M" if gender == "m" else "F"
 
 
 rule cnvkit_export_seg:
