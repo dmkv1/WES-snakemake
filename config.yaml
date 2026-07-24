@@ -74,11 +74,6 @@ params:
       prefetch: 1
     cnvkit:
       filter_ci: false  # Set to true to enable segments filtering based on CI
-      # Off-target (antitarget) inclusion is NOT set here: this pipeline
-      # consumes the PON's cnvkit_antitargets bed and reference_*.cnn directly.
-      # It is governed by WES-PON-smk params.cnvkit.use_offtarget at PON-build
-      # time (currently off-target disabled for the UTR exomes -> empty
-      # antitargets.bed -> target-only .cnr here, automatically).
     cnv:
       # "samplesheet": always use the samplesheet purity column (default,
       #                zero behaviour change, rollback path).
