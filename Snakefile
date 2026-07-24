@@ -84,17 +84,28 @@ for _, row in samples.iterrows():
 # Create probe configuration dictionary
 probe_dict = {}
 for _, row in samples.iterrows():
-    if pd.notna(row["ID"]) and pd.notna(row["probes"]):
+    if pd.notna(row["ID"]) and pd.notna(row["capture_kit"]):
         if row["ID"] not in probe_dict:
             probe_dict[row["ID"]] = {}
-        probe_dict[row["ID"]][row["sample"]] = row["probes"]
+        probe_dict[row["ID"]][row["sample"]] = row["capture_kit"]
 
-purity_dict = {}
+# tumor_fraction: orthogonal/measured tumor cell fraction (sorting, cytometry,
+# PDX=1), used as ground truth for cnvkit purity when present. Blank/NA means
+# unknown -> resolve_purity_source falls back to PureCN (see purecn.smk). Stored
+# as float or None.
+tumor_fraction_dict = {}
 for _, row in samples.iterrows():
     if pd.notna(row["ID"]):
-        if row["ID"] not in purity_dict:
-            purity_dict[row["ID"]] = {}
-        purity_dict[row["ID"]][row["sample"]] = row["purity"]
+        if row["ID"] not in tumor_fraction_dict:
+            tumor_fraction_dict[row["ID"]] = {}
+        val = row["tumor_fraction"]
+        tf = None if pd.isna(val) or str(val).strip() in ("", "NA") else float(val)
+        if tf is not None and not (0 < tf <= 1):
+            raise ValueError(
+                f"{row['sample']}: tumor_fraction must be in (0,1] or NA/blank "
+                f"(got {val!r}); 0 is not a valid tumor fraction"
+            )
+        tumor_fraction_dict[row["ID"]][row["sample"]] = tf
 
 # Validate tumor-only runs have PON configured
 for run, data in runs_dict.items():
@@ -121,7 +132,7 @@ common.fastq_dict = fastq_dict
 common.runs_dict = runs_dict
 common.pdx_dict = pdx_dict
 common.probe_dict = probe_dict
-common.purity_dict = purity_dict
+common.tumor_fraction_dict = tumor_fraction_dict
 common.config = config
 common.samples = samples
 

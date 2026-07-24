@@ -75,14 +75,14 @@ params:
     cnvkit:
       filter_ci: false  # Set to true to enable segments filtering based on CI
     cnv:
-      # "samplesheet": always use the samplesheet purity column (default,
-      #                zero behaviour change, rollback path).
-      # "purecn": use PureCN's Purity/Ploidy for paired tumors when the run
-      #           succeeded and is not Flagged; falls back to samplesheet
-      #           purity otherwise. PureCN still runs regardless of this
-      #           toggle, so its numbers are always in the report for
-      #           comparison even when unused.
-      purity_source: "samplesheet"
+      # Purity/ploidy for cnvkit_call, resolved per tumor by
+      # resolve_purity_source (purecn.smk) in priority: (1) samplesheet
+      # tumor_fraction when known; (2) PureCN's estimate if it ran, didn't fail,
+      # and its ONLY flag is POOR GOF; (3) else assume pure (purity 1).
+      # use_purecn_purity=false disables step 2 (known-or-assume-pure only), the
+      # rollback path. PureCN still runs regardless, so its numbers stay in the
+      # report for comparison even when unused.
+      use_purecn_purity: true
     fastp:
       # adds sequence-based PE adapter detection as a backstop to R1/R2 overlap analysis
       detect_adapter_for_pe: true

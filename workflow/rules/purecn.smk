@@ -90,12 +90,19 @@ rule purecn_run:
 
 
 rule resolve_purity_source:
-    """Single decision point for tumor purity/ploidy: PureCN (paired tumors,
-    when not Flagged and config-enabled) or the samplesheet constant
-    (tumor-only, PureCN disabled/failed-to-be-confident, or Flagged).
-    cnvkit_call and combine_results both read this sidecar rather than each
-    independently deciding, so they can never disagree on which value was
-    actually used."""
+    """Single decision point for the purity/ploidy that cnvkit_call and
+    combine_results consume, in priority order:
+      1. 'known'        — samplesheet tumor_fraction (orthogonal ground truth:
+                          sorting/cytometry, PDX=1). Overrides PureCN.
+      2. 'purecn'       — PureCN's estimate, IF it ran, did not Fail, and its
+                          ONLY flag (if any) is POOR GOF. No numeric GOF cutoff;
+                          any other flag (NON-ABERRANT, LOW PURITY, NOISY
+                          SEGMENTATION, EXCESSIVE LOH, contamination...) rejects.
+      3. 'assumed_pure' — no known value and no usable PureCN estimate: purity 1
+                          (cnvkit calls unrescaled, as in the pre-PureCN default;
+                          e.g. tumor-only samples).
+    Both consumers read this one sidecar, so they can never disagree on the
+    value actually used."""
     input:
         purecn_csv=lambda w: (
             f"work/purecn/{w.run}/{w.sample}/{w.sample}.csv"
@@ -105,34 +112,62 @@ rule resolve_purity_source:
         purity_csv="work/purity/{run}/{sample}/{sample}.purity.csv",
     params:
         eligible=is_purecn_eligible,
-        toggle=config["params"]["cnv"]["purity_source"],
-        sheet_purity=get_purity,
+        use_purecn=config["params"]["cnv"]["use_purecn_purity"],
+        known=get_known_purity,
     log:
         "work/logs/resolve_purity_source_{run}_{sample}.log",
     run:
         import csv
         import os
 
-        purecn_purity = purecn_ploidy = purecn_flagged = ""
-        source = "samplesheet"
+        purecn_purity = purecn_ploidy = purecn_flagged = purecn_comment = ""
+        purecn_failed = False
 
-        if params.eligible:
+        if params.eligible and input.purecn_csv:
             with open(input.purecn_csv) as fh:
                 row = next(csv.DictReader(fh))
             purecn_purity = row["Purity"]
             purecn_ploidy = row["Ploidy"]
             purecn_flagged = row["Flagged"]
+            purecn_comment = row.get("Comment", "")
+            purecn_failed = str(row.get("Failed", "")).strip().upper() == "TRUE"
 
-            if params.toggle == "purecn":
-                is_flagged = str(purecn_flagged).strip().upper() == "TRUE"
-                has_valid_purity = purecn_purity not in ("", "NA", None)
-                if not is_flagged and has_valid_purity:
-                    source = "purecn"
-                else:
-                    source = "samplesheet_fallback_flagged"
+        def purecn_usable():
+            # Accept PureCN only if enabled, it ran, didn't fail, has a purity,
+            # and its only flag reason (if flagged) is POOR GOF.
+            if not (params.use_purecn and params.eligible and input.purecn_csv):
+                return False
+            if purecn_failed or purecn_purity in ("", "NA", None):
+                return False
+            if str(purecn_flagged).strip().upper() != "TRUE":
+                return True  # not flagged
+            reasons = [r.strip() for r in str(purecn_comment).split(";") if r.strip()]
+            return bool(reasons) and all(
+                r.upper().startswith("POOR GOF") for r in reasons
+            )
 
-        purity = purecn_purity if source == "purecn" else params.sheet_purity
-        ploidy = purecn_ploidy if source == "purecn" else ""
+        # Integer baseline ploidy for cnvkit --ploidy (which is type=int) and the
+        # QC table, resolved independently of the purity source. PureCN reports
+        # only a continuous Ploidy, so round it half-up to the nearest integer
+        # (min 1); fall back to diploid when PureCN did not run, failed, or
+        # produced no usable value.
+        def round_ploidy(val):
+            try:
+                p = float(val)
+            except (TypeError, ValueError):
+                return None
+            return max(1, int(p + 0.5)) if p > 0 else None
+
+        ploidy_int = None if purecn_failed else round_ploidy(purecn_ploidy)
+        ploidy = str(ploidy_int) if ploidy_int is not None else "2"
+
+        known = params.known  # float in (0,1] or None
+        if known is not None:
+            purity, source = str(known), "known"
+        elif purecn_usable():
+            purity, source = purecn_purity, "purecn"
+        else:
+            purity, source = "1", "assumed_pure"
 
         os.makedirs(os.path.dirname(output.purity_csv), exist_ok=True)
         with open(output.purity_csv, "w", newline="") as fh:
@@ -144,9 +179,11 @@ rule resolve_purity_source:
                     "purity",
                     "ploidy",
                     "source",
+                    "tumor_fraction",
                     "purecn_purity",
                     "purecn_ploidy",
                     "purecn_flagged",
+                    "purecn_comment",
                 ],
             )
             writer.writeheader()
@@ -157,8 +194,10 @@ rule resolve_purity_source:
                     "purity": purity,
                     "ploidy": ploidy,
                     "source": source,
+                    "tumor_fraction": "" if known is None else known,
                     "purecn_purity": purecn_purity,
                     "purecn_ploidy": purecn_ploidy,
                     "purecn_flagged": purecn_flagged,
+                    "purecn_comment": purecn_comment,
                 }
             )

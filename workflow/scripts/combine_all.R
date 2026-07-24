@@ -9,12 +9,12 @@ suppressPackageStartupMessages({
 
 samplesheet <- snakemake@params[["samplesheet"]]
 
-# Load samplesheet for metadata (drop FASTQ paths — not needed). Rename
-# 'probes' up front: CNVkit's per-segment CSV also has a 'probes' column
-# (probe count), so joining unrenamed would collide.
+# Load samplesheet for metadata (drop FASTQ paths — not needed). The samplesheet
+# capture-kit column is already named 'capture_kit' (distinct from CNVkit's
+# per-segment 'probes' probe-count column, so the join won't collide).
 meta <- read_csv(samplesheet, show_col_types = FALSE) %>%
   select(-any_of(c("fq1", "fq2"))) %>%
-  rename(sID = sample, capture_kit = probes)
+  rename(sID = sample)
 
 # AnnotSV places VCF sample columns (named after the actual sample IDs,
 # which differ per row) between FORMAT (pos 14) and Annotation_mode.
@@ -61,6 +61,12 @@ combine_csvs <- function(csv_files, rename_fn = identity) {
 
   combined <- bind_rows(parts)
   combined <- type_convert(combined, col_types = cols())
+
+  # Drop any non-key columns the per-sample CSVs share with the samplesheet
+  # (e.g. tumor_fraction) so the join doesn't emit duplicate .x/.y pairs;
+  # the samplesheet copy is authoritative.
+  dup_cols <- setdiff(intersect(names(combined), names(meta)), c("sID", "ID"))
+  combined <- combined[, setdiff(names(combined), dup_cols)]
   combined <- left_join(combined, meta, by = c("sID", "ID"))
 
   meta_cols <- intersect(names(meta), names(combined))

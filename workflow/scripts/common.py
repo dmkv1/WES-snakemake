@@ -28,8 +28,11 @@ def get_library_prep_for_sample(sample_name):
 def get_probe_version(wildcards):
     return probe_dict[wildcards.run][wildcards.sample]
 
-def get_purity(wildcards):
-    return purity_dict[wildcards.run][wildcards.sample]
+def get_known_purity(wildcards):
+    """Orthogonal/measured tumor fraction from the samplesheet (tumor_fraction
+    column), or None when unknown. Ground truth for cnvkit purity; when None,
+    resolve_purity_source falls back to PureCN."""
+    return tumor_fraction_dict[wildcards.run][wildcards.sample]
 
 
 def is_paired_run(run):
@@ -67,10 +70,9 @@ def get_purity_ploidy_args(wildcards, input):
 
     with open(input.purity_csv) as fh:
         row = next(csv.DictReader(fh))
-    if row["source"] == "purecn":
-        return f"--purity {row['purity']} --ploidy {row['ploidy']}"
-    # No --ploidy -> cnvkit's own default (2), matching pre-PureCN behaviour.
-    return f"--purity {row['purity']}"
+    # resolve_purity_source always writes an integer ploidy (PureCN's rounded
+    # estimate, else diploid), so pass it regardless of the purity source.
+    return f"--purity {row['purity']} --ploidy {row['ploidy']}"
 
 
 def parse_fastq_header(fastq_path: str, sample_name: str) -> Dict[str, str]:
