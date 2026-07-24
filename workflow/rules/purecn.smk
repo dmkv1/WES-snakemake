@@ -6,29 +6,42 @@ def get_sample_sex_purecn(wildcards):
     return "M" if gender == "m" else "F"
 
 
-rule cnvkit_export_seg:
+rule purecn_tumor_coverage:
+    # Reformats the tumor .cnr into PureCN's GATK3-style coverage
+    # (Target/total_coverage/on_target) so PureCN can run its OWN segmentation.
+    # PureCN misreads CNVkit's .cnr `depth` column as per-interval read counts
+    # and drops every interval below its 100-read floor; the depth*width scale
+    # here matches how the NormalDB coverage was built (WES-PON-smk
+    # purecn_coverage), so tumor and normals are comparable. This replaces the
+    # old cnvkit_export_seg handoff: feeding PureCN CNVkit's CBS segmentation
+    # (--seg-file) inherited its over-segmentation (500-700 segments > PureCN's
+    # max.segments=300) and collapsed purity to a flat NON-ABERRANT optimum.
+    # Letting PureCN segment (native CBS, noise-calibrated) recovered PDX purity
+    # from 0.18-0.32 to 0.86-0.93. CNVkit's own calling arm is unaffected.
     input:
-        cns="work/cnvkit/{run}/{sample}/{sample}.cns",
+        cnr="work/cnvkit/{run}/{sample}/{sample}.filtered.cnr",
     output:
-        seg="work/purecn/{run}/{sample}/{sample}.seg",
-    container:
-        config["containers"]["cnvkit"]
-    log:
-        "work/logs/cnvkit_export_seg_{run}_{sample}.log",
-    shell:
-        """
-        cnvkit.py export seg {input.cns} \
-            --enumerate-chroms \
-            -o {output.seg} \
-            > {log} 2>&1
-        """
+        cov="work/purecn/{run}/{sample}/{sample}.purecn_cov.txt",
+    run:
+        cov = pd.read_csv(input.cnr, sep="\t")
+        cov["on_target"] = cov["gene"] != "Antitarget"
+        cov["Target"] = (
+            cov["chromosome"]
+            + ":"
+            + (cov["start"] + 1).astype(str)
+            + "-"
+            + cov["end"].astype(str)
+        )
+        cov["total_coverage"] = cov["depth"] * (cov["end"] - cov["start"])
+        cov[["Target", "total_coverage", "on_target"]].to_csv(
+            output.cov, sep="\t", index=False
+        )
 
 
 rule purecn_run:
     input:
         vcf="work/cnvkit/{run}/{sample}/{sample}.hetsnp.vcf",
-        cnr="work/cnvkit/{run}/{sample}/{sample}.filtered.cnr",
-        seg="work/purecn/{run}/{sample}/{sample}.seg",
+        cov="work/purecn/{run}/{sample}/{sample}.purecn_cov.txt",
         normaldb=get_purecn_normaldb,
         mapping_bias=get_purecn_mapping_bias,
         snp_blacklist=config["refs"]["purecn"]["snp_blacklist"],
@@ -36,7 +49,13 @@ rule purecn_run:
         csv="work/purecn/{run}/{sample}/{sample}.csv",
         rds="work/purecn/{run}/{sample}/{sample}.rds",
         pdf="work/purecn/{run}/{sample}/{sample}.pdf",
-        genes="work/purecn/{run}/{sample}/{sample}_genes.csv",
+        # No _genes.csv: gene-level calls need gene-annotated intervals, which
+        # PureCN previously got from the CNVkit .cnr `gene` column. The native
+        # coverage (Target/total_coverage/on_target) carries no genes, so PureCN
+        # skips gene-level calls ("--intervals does not contain gene symbols").
+        # This artifact was unused anyway — the report's gene-level CNVs come
+        # from CNVkit's .cns, and nothing reads PureCN _genes.csv. To restore it,
+        # pass a PureCN interval file (--intervals) built with gene symbols.
         loh="work/purecn/{run}/{sample}/{sample}_loh.csv",
     params:
         out_dir="work/purecn/{run}/{sample}",
@@ -54,15 +73,14 @@ rule purecn_run:
         Rscript "$PURECN_SCRIPT" \
             --out {params.out_dir} \
             --sampleid {params.sample_id} \
-            --tumor {input.cnr} \
+            --tumor {input.cov} \
             --sex {params.sex} \
-            --seg-file {input.seg} \
             --vcf {input.vcf} \
             --genome {params.genome} \
             --normaldb {input.normaldb} \
             --mapping-bias-file {input.mapping_bias} \
             --snp-blacklist {input.snp_blacklist} \
-            --fun-segmentation Hclust \
+            --fun-segmentation CBS \
             --min-base-quality 20 \
             --post-optimize \
             --cores {threads} \

@@ -6,8 +6,8 @@ run_id: "dev test"            # Human-readable label prepended to Telegram notif
 # tumors are preprocessed by the identical GATK build (byte-identical BAMs).
 containers:
   gatk: "docker://broadinstitute/gatk:4.6.2.0"
-  cnvkit: "docker://etal/cnvkit:0.9.14"
   vep: "docker://ensemblorg/ensembl-vep:release_116.0"
+  cnvkit: "docker://etal/cnvkit:0.9.14"
 
 # Each probe type points at the original Agilent kit BED files (header lines and
 # all; GATK tools and mosdepth skip browser/track, index_bed strips them):
@@ -74,6 +74,11 @@ params:
       prefetch: 1
     cnvkit:
       filter_ci: false  # Set to true to enable segments filtering based on CI
+      # Off-target (antitarget) inclusion is NOT set here: this pipeline
+      # consumes the PON's cnvkit_antitargets bed and reference_*.cnn directly.
+      # It is governed by WES-PON-smk params.cnvkit.use_offtarget at PON-build
+      # time (currently off-target disabled for the UTR exomes -> empty
+      # antitargets.bed -> target-only .cnr here, automatically).
     cnv:
       # "samplesheet": always use the samplesheet purity column (default,
       #                zero behaviour change, rollback path).
@@ -89,7 +94,7 @@ params:
     bqsr:
       interval_padding: 100
 
-# Built by ../WES-PON-smk from all current normals, per capture kit.
+# Built by WES-PON-smk from all current normals, per capture kit.
 panel_of_normals:
   path: "/mnt/data/NGS/WES/PON/WES-PON-smk"
   cnvkit:
