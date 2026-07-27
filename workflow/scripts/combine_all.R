@@ -16,26 +16,6 @@ meta <- read_csv(samplesheet, show_col_types = FALSE) %>%
   select(-any_of(c("fq1", "fq2"))) %>%
   rename(sID = sample)
 
-# AnnotSV places VCF sample columns (named after the actual sample IDs,
-# which differ per row) between FORMAT (pos 14) and Annotation_mode.
-# Rename them to generic names before binding.
-annotsv_fixed_cols <- c(
-  "AnnotSV_ID", "SV_chrom", "SV_start", "SV_end", "SV_length",
-  "SV_type", "Samples_ID", "ID", "REF", "ALT", "QUAL",
-  "FILTER", "INFO", "FORMAT"
-)
-
-rename_sv_sample_cols <- function(df) {
-  annot_mode_pos <- match("Annotation_mode", names(df))
-  if (is.na(annot_mode_pos)) return(df)
-  vcf_sample_cols <- setdiff(names(df)[seq_len(annot_mode_pos - 1L)], annotsv_fixed_cols)
-  for (i in seq_along(vcf_sample_cols)) {
-    new_name <- if (i == 1L) "FORMAT_vcf" else paste0("FORMAT_vcf_", i)
-    names(df)[names(df) == vcf_sample_cols[i]] <- new_name
-  }
-  df
-}
-
 # Row-bind one data type's per-sample CSVs, tag with sample/run, and join
 # samplesheet metadata (moved to the front of the result).
 combine_csvs <- function(csv_files, rename_fn = identity) {
@@ -76,7 +56,7 @@ combine_csvs <- function(csv_files, rename_fn = identity) {
 
 combined_snvs <- combine_csvs(snakemake@input[["snv_csvs"]])
 combined_cnvs <- combine_csvs(snakemake@input[["cnv_csvs"]])
-combined_svs  <- combine_csvs(snakemake@input[["sv_csvs"]], rename_sv_sample_cols)
+combined_svs  <- combine_csvs(snakemake@input[["sv_csvs"]])
 combined_qc   <- combine_csvs(snakemake@input[["qc_csvs"]])
 
 # Collapse the annotated cohort pairs table to one row per sample and join the

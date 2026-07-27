@@ -83,35 +83,3 @@ rule filter_manta_variants:
         """
         bcftools view -f PASS {input.vcf} | bcftools sort -Ov -o {output.vcf}
         """
-
-
-rule annotate_sv:
-    input:
-        vcf="work/manta/{run}/{sample}/{sample}.SV.filtered.vcf",
-    output:
-        tsv="work/manta/{run}/{sample}/{sample}.SV.annotated.tsv",
-    params:
-        annotations=config["refs"]["annotsv_annotations"]["path"],
-        genome_build=config["refs"]["annotsv_annotations"]["genome_build"],
-        output_prefix="work/manta/{run}/{sample}/{sample}.SV.annotated"
-    threads: 1
-    conda:
-        "../envs/annotsv.yaml"
-    log:
-        "work/logs/AnnotSV_{run}_{sample}.log",
-    shell:
-        """
-        variant_count=$(bcftools view -H {input.vcf} | wc -l)
-        
-        if [ "$variant_count" -eq 0 ]; then
-            touch {output.tsv}
-            echo "No variants to annotate" > {log}
-        else
-            AnnotSV \
-            -SVinputFile {input.vcf} \
-            -outputFile {params.output_prefix} \
-            -genomeBuild {params.genome_build} \
-            -annotationsDir {params.annotations} \
-            > {log} 2>&1
-        fi
-        """

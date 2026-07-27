@@ -282,8 +282,46 @@ if (!exists("CNVs.df")) {
   CNVs.df <- read_tsv(input_cns_cnv, show_col_types = FALSE)
 }
 
-# Parse the .tsv with the SVs from Manta
-SVs.df <- read_tsv(input_tsv_sv, show_col_types = F)
+# Parse the consensus (Manta + DELLY) SV annotations from AnnotSV. Report one
+# row per SV (AnnotSV "full" mode) with a somatic-relevant column subset; the
+# per-gene "split" rows stay in the on-disk TSV but would flood the sheet (a
+# single large SV overlaps hundreds of genes). Decode SURVIVOR's SUPP_VEC
+# (bit 1 = Manta, bit 2 = DELLY) into a readable SV_callers column.
+sv_report_cols <- c(
+  "SV_callers", "AnnotSV_ID", "SV_chrom", "SV_start", "SV_end",
+  "SV_length", "SV_type", "Gene_count", "Gene_name", "FILTER",
+  "AnnotSV_ranking_score", "ACMG_class", "AnnotSV_ranking_criteria"
+)
+
+SVs.raw <- tryCatch(
+  read_tsv(input_tsv_sv, show_col_types = FALSE),
+  error = function(e) tibble()
+)
+
+if (nrow(SVs.raw) > 0 && "Annotation_mode" %in% names(SVs.raw)) {
+  SVs.df <- SVs.raw %>% dplyr::filter(Annotation_mode == "full")
+
+  caller_names <- c("Manta", "DELLY")
+  supp_vec <- ifelse(
+    grepl("SUPP_VEC=", SVs.df$INFO),
+    sub(".*SUPP_VEC=([01]+).*", "\\1", SVs.df$INFO),
+    NA_character_
+  )
+  SVs.df$SV_callers <- vapply(supp_vec, function(v) {
+    if (is.na(v)) return(NA_character_)
+    bits <- strsplit(v, "")[[1]] == "1"
+    paste(caller_names[seq_along(bits)][bits], collapse = ";")
+  }, character(1))
+
+  # Fixed report schema (stable across samples for downstream row-binding).
+  SVs.df <- SVs.df %>% dplyr::select(dplyr::any_of(sv_report_cols))
+  for (m in setdiff(sv_report_cols, names(SVs.df))) SVs.df[[m]] <- NA_character_
+  SVs.df <- SVs.df %>% dplyr::select(dplyr::all_of(sv_report_cols))
+} else {
+  SVs.df <- as_tibble(setNames(
+    rep(list(character()), length(sv_report_cols)), sv_report_cols
+  ))
+}
 
 # Per-sample QC row: which purity source was used, plus PureCN's raw
 # estimate for comparison even on samples where it wasn't used (see

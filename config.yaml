@@ -1,4 +1,4 @@
-samplesheet: "samplesheet_test.csv"
+samplesheet: "samplesheet_test_small.csv"
 telegram_bot_env: "~/.telegram_bot.env"  # Path to .telegram_bot.env file; leave empty to disable notifications
 run_id: "dev test"            # Human-readable label prepended to Telegram notifications
 
@@ -8,6 +8,7 @@ containers:
   gatk: "docker://broadinstitute/gatk:4.6.2.0"
   vep: "docker://ensemblorg/ensembl-vep:release_116.0"
   cnvkit: "docker://etal/cnvkit:0.9.14"
+  delly: "docker://dellytools/delly:v2.5.1"
 
 # Each probe type points at the original Agilent kit BED files (header lines and
 # all; GATK tools and mosdepth skip browser/track, index_bed strips them):
@@ -88,6 +89,24 @@ params:
       detect_adapter_for_pe: true
     bqsr:
       interval_padding: 100
+    delly:
+      # DELLY short-read recommendations (per the DELLY author): exclude
+      # telomeres/centromeres/unplaced contigs and filter input reads stringently.
+      # DELLY is the confirmatory caller in the Manta consensus, so favour
+      # precision. Leave exclude empty to omit -x. See README "Reference files"
+      # for sourcing the hg38 exclude template.
+      exclude: "/mnt/data/NGS/refs/delly/human.hg38.excl.tsv"
+      map_qual: 20        # -q  min. paired-end mapping quality (default 1)
+      mad_cutoff: 15      # -s  insert-size MAD cutoff, deletions only (default 9)
+      min_clique_size: 5  # -z  min. PE/SR clique size; raise for high-coverage (default 2)
+      # SURVIVOR merge of Manta + DELLY SV calls (consensus).
+      survivor_max_dist: 1000  # max breakpoint distance (bp) to call two SVs the same
+      survivor_min_size: 0     # min SV size to keep in the merge (0 = no size filter)
+      # Drop megabase intra-chromosomal SVs from the consensus before annotation:
+      # WES SV callers (esp. DELLY off-target split/PE reads) produce spurious
+      # multi-Mb INV/DUP that span hundreds of genes; large CNVs are covered by
+      # CNVkit. Translocations (BND) are never size-filtered. 0 disables the cap.
+      max_sv_size: 3000000
     somalier:
       # Relatedness/swap QC thresholds (report-only, no DAG gating). Applied by
       # somalier_summarise over the cohort pairs table. Defaults tuned to

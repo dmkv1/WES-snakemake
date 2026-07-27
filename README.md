@@ -56,6 +56,12 @@ By default, gnomAD_exome and gnomAD_genome are disabled in the Funcotator data s
 Other resources:
 * Exome capture regions in BED format — provided by the exome library preparation kit manufacturer.
 * AnnotSV annotations — can be downloaded using the [INSTALL_annotations shell script](https://github.com/lgmgeo/AnnotSV/blob/master/bin/INSTALL_annotations.sh).
+* DELLY exclude regions (`params.delly.exclude`) — telomeres/centromeres/unplaced contigs, per the DELLY author's short-read recommendation. Download the hg38 template:
+  ```bash
+  wget -O /mnt/data/NGS/refs/delly/human.hg38.excl.tsv \
+    https://raw.githubusercontent.com/dellytools/delly/main/excludeTemplates/human.hg38.excl.tsv
+  ```
+  Uses `chr`-prefixed contig names, matching `Homo_sapiens_assembly38.fasta`.
 * PureCN SNP blacklist (`refs.purecn.snp_blacklist`) — UCSC Simple Repeats (Tandem Repeats Finder) track for hg38, passed to `PureCN.R --snp-blacklist` to exclude repeat-region variants from purity/ploidy fitting:
   ```bash
   wget -O simpleRepeat.txt.gz https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/simpleRepeat.txt.gz
@@ -99,6 +105,7 @@ Run groups **without** a `CTRL` sample are processed in tumor-only mode. In this
 - A population allele frequency filter is applied after PASS filtering to remove common germline variants (configurable threshold, default AF > 0.001 against gnomAD).
 - CNVkit B-allele frequency (BAF) analysis and HaplotypeCaller germline calling are skipped.
 - Manta runs in tumor-only mode.
+- DELLY runs as an unfiltered germline call on the tumor alone (no somatic filter, which requires a matched normal).
 
 A PON must be configured in `config.yaml` for each probe version used in tumor-only runs:
 
@@ -187,11 +194,17 @@ All GATK steps use the official GATK Docker container (`broadinstitute/gatk:4.6.
 
 ### 7. Structural Variant Calling
 
+Two orthogonal callers are run and reconciled into a single consensus SV set.
+
 - **Manta**: SV detection restricted to the exome capture regions.
   - *Paired mode*: Outputs somatic SVs (`somaticSV.vcf.gz`).
   - *Tumor-only mode*: Outputs tumor SVs (`tumorSV.vcf.gz`). Both are renamed to a consistent `sv_output.vcf.gz` internally.
-- **bcftools**: PASS variants extracted and sorted.
-- **AnnotSV**: Structural variant annotation using the GRCh38 annotation database. If no variants pass filtering, an empty output file is created.
+- **DELLY**: orthogonal SV caller. Consumes the final analysis BAM directly (no base-quality capping). Run with the DELLY author's short-read settings (configurable in `params.delly`): exclude regions (`-x`), min PE mapping quality `-q 20`, insert-size MAD cutoff `-s 15`, and min clique size `-z 5` for high-coverage on-target data. DELLY has no exome mode, so its calls are restricted to the capture-kit target BED after calling.
+  - *Paired mode*: `delly sr` on tumor + matched normal, then `delly filter -f somatic`.
+  - *Tumor-only mode*: `delly sr` on the tumor alone (unfiltered germline calls).
+- **bcftools**: PASS variants extracted and sorted (both callers).
+- **SURVIVOR**: merges the Manta and DELLY PASS VCFs into a consensus set (breakpoint distance and min SV size configurable via `params.delly`), recording per-SV caller support in `SUPP_VEC` (bit 1 = Manta, bit 2 = DELLY).
+- **AnnotSV**: annotates the merged consensus VCF against the GRCh38 annotation database. If no variants pass filtering, an empty output file is created.
 
 ### 8. Results Integration
 
@@ -203,7 +216,7 @@ An R script (`combine_results.R`) merges all results into a single Excel workboo
 |-------|----------|
 | **SNVs** | Funcotator-annotated PASS SNVs/Indels with per-sample AF, GT, DP, AD; copy number context (total CN, major/minor allele CN from CNVkit); and calculated Cancer Cell Fraction (CCF) |
 | **CNVs** | CNVkit segment-level copy number calls |
-| **SVs** | AnnotSV-annotated structural variants |
+| **SVs** | AnnotSV-annotated consensus (Manta + DELLY) structural variants, with an `SV_callers` column naming the supporting caller(s) |
 
 **CCF Calculation**: Cancer Cell Fraction estimates what fraction of cancer cells carry the mutation:
 
@@ -260,6 +273,18 @@ Talevich E, Shain AH, Botton T, Bastian BC. CNVkit: Genome-Wide Copy Number Dete
 
 ```
 Chen X et al. Manta: rapid detection of structural variants and indels for germline and cancer sequencing applications. Bioinformatics 32(8):1220–1222 (2016). https://doi.org/10.1093/bioinformatics/btv710
+```
+
+#### DELLY
+
+```
+Rausch T et al. DELLY: structural variant discovery by integrated paired-end and split-read analysis. Bioinformatics 28(18):i333–i339 (2012). https://doi.org/10.1093/bioinformatics/bts378
+```
+
+#### SURVIVOR
+
+```
+Jeffares DC et al. Transient structural variations have strong effects on quantitative traits and reproductive isolation in fission yeast. Nature Communications 8:14061 (2017). https://doi.org/10.1038/ncomms14061
 ```
 
 #### AnnotSV

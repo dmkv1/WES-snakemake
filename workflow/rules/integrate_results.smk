@@ -1,7 +1,7 @@
 rule combine_results:
     input:
         snv_vcf="results/{run}/{sample}/{sample}.SNV.vcf",
-        sv_tsv="work/manta/{run}/{sample}/{sample}.SV.annotated.tsv",
+        sv_tsv="work/sv_merge/{run}/{sample}/{sample}.SV.annotated.tsv",
         cnv_cns="work/cnvkit/{run}/{sample}/{sample}.call.cns",
         purity_csv="work/purity/{run}/{sample}/{sample}.purity.csv",
     output:
