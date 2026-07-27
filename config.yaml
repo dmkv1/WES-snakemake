@@ -88,6 +88,14 @@ params:
       detect_adapter_for_pe: true
     bqsr:
       interval_padding: 100
+    somalier:
+      # Relatedness/swap QC thresholds (report-only, no DAG gating). Applied by
+      # somalier_summarise over the cohort pairs table. Defaults tuned to
+      # observed within-patient spread (LOH/aneuploidy depress relatedness, but
+      # ibs0 stays ~0 within an individual; a true swap drives ibs0 up).
+      ibs0_frac_max: 0.005     # within-patient FAIL when ibs0/n exceeds this
+      relatedness_warn: 0.85   # within-patient WARN when relatedness below this
+      unrelated_max: 0.30      # cross-patient FAIL when relatedness exceeds this
 
 # Built by WES-PON-smk from all current normals, per capture kit.
 panel_of_normals:

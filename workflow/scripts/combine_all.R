@@ -79,6 +79,48 @@ combined_cnvs <- combine_csvs(snakemake@input[["cnv_csvs"]])
 combined_svs  <- combine_csvs(snakemake@input[["sv_csvs"]], rename_sv_sample_cols)
 combined_qc   <- combine_csvs(snakemake@input[["qc_csvs"]])
 
+# Collapse the annotated cohort pairs table to one row per sample and join the
+# somalier relatedness summary onto combined_qc (keyed by sID = tumor sample):
+#   rel_normal        relatedness to this sample's matched normal ('normal' col)
+#   rel_min_patient   lowest relatedness among within-patient pairs (LOH-aware)
+#   rel_worst_partner the partner sample giving that minimum
+#   rel_max_unrelated highest relatedness to any cross-patient sample (swap flag)
+#   somalier_flag     worst verdict (FAIL > WARN > PASS) over pairs touching it
+rel <- read_tsv(snakemake@input[["relatedness_tsv"]], show_col_types = FALSE)
+
+# Long form: one row per (sample, partner) so every pair is seen from both ends.
+rel_long <- bind_rows(
+  rel %>% transmute(sID = sample_a, partner = sample_b, same_patient,
+                    relatedness, verdict),
+  rel %>% transmute(sID = sample_b, partner = sample_a, same_patient,
+                    relatedness, verdict)
+)
+
+flag_rank <- c(PASS = 1L, WARN = 2L, FAIL = 3L)
+rel_summary <- rel_long %>%
+  group_by(sID) %>%
+  summarise(
+    rel_min_patient   = suppressWarnings(min(relatedness[same_patient], na.rm = TRUE)),
+    rel_worst_partner = partner[same_patient][which.min(relatedness[same_patient])][1],
+    rel_max_unrelated = suppressWarnings(max(relatedness[!same_patient], na.rm = TRUE)),
+    somalier_flag     = names(flag_rank)[max(flag_rank[verdict])],
+    .groups = "drop"
+  ) %>%
+  mutate(
+    rel_min_patient   = ifelse(is.finite(rel_min_patient), rel_min_patient, NA_real_),
+    rel_max_unrelated = ifelse(is.finite(rel_max_unrelated), rel_max_unrelated, NA_real_)
+  )
+
+# rel_normal: relatedness of each tumor to the normal named in its QC row.
+if ("normal" %in% names(combined_qc)) {
+  rel_pair <- rel_long %>% select(sID, partner, relatedness)
+  combined_qc <- combined_qc %>%
+    left_join(rel_pair, by = c("sID", "normal" = "partner")) %>%
+    rename(rel_normal = relatedness)
+}
+
+combined_qc <- left_join(combined_qc, rel_summary, by = "sID")
+
 write_tsv(combined_snvs, snakemake@output[["snv_tsv"]])
 write_tsv(combined_cnvs, snakemake@output[["cnv_tsv"]])
 write_tsv(combined_svs,  snakemake@output[["sv_tsv"]])

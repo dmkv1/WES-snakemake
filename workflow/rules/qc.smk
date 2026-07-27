@@ -129,8 +129,10 @@ rule multiqc:
             for run in runs_dict
             for sample in get_all_samples_for_run(run)
         ],
-        somalier_samples=[f"results/qc/somalier/{run}/{run}.samples.tsv" for run in runs_dict],
-        somalier_pairs=[f"results/qc/somalier/{run}/{run}.pairs.tsv" for run in runs_dict],
+        # Cohort all-vs-all relate (not per-run) so MultiQC's relatedness scatter
+        # gets every pair, including cross-patient pairs that flag sample swaps.
+        somalier_samples="results/qc/somalier/cohort/cohort.samples.tsv",
+        somalier_pairs="results/qc/somalier/cohort/cohort.pairs.tsv",
         # forces run_xengsort to complete before multiqc; also keeps its temp() graft fastqs
         # around until multiqc runs instead of being deleted right after bwa_map consumes them
         xengsort_graft=[

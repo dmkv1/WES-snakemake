@@ -209,5 +209,8 @@ rule all:
             for sample in runs_dict[run]["tumors"]
             if is_paired_run(run)
         ],
-        # Somalier sample-swap / sex QC report
-        [f"results/qc/somalier/{run}/{run}.html" for run in runs_dict],
+        # Somalier sample-swap / sex QC: cohort all-vs-all relate (HTML +
+        # MultiQC), annotated relatedness table, and sample x sample heatmap.
+        "results/qc/somalier/cohort/cohort.html",
+        "results/combined/combined_relatedness.tsv",
+        "results/combined/relatedness_heatmap.png",

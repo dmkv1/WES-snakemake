@@ -42,6 +42,7 @@ rule merge_results:
             for run in runs_dict
             for sample in runs_dict[run]["tumors"]
         ],
+        relatedness_tsv="results/combined/combined_relatedness.tsv",
     output:
         snv_tsv="results/combined/combined_snvs.tsv",
         cnv_tsv="results/combined/combined_cnvs.tsv",
