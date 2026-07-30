@@ -54,3 +54,16 @@ rule merge_results:
         "../envs/r_vcf.yaml"
     script:
         "../scripts/combine_all.R"
+
+
+rule cohort_maf:
+    """Derive a maftools/GDC-compatible cohort MAF from the combined SNV table.
+    Isolated downstream of merge_results: a failure leaves combined_* intact."""
+    input:
+        snv_tsv="results/combined/combined_snvs.tsv",
+    output:
+        maf="results/combined/cohort.maf",
+    conda:
+        "../envs/r_vcf.yaml"
+    script:
+        "../scripts/combined_to_maf.R"

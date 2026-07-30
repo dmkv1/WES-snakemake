@@ -185,6 +185,8 @@ rule all:
         "results/combined/combined_cnvs.tsv",
         "results/combined/combined_svs.tsv",
         "results/combined/combined_qc.tsv",
+        # Cohort MAF for maftools (oncoplot/TMB/etc.)
+        "results/combined/cohort.maf",
         # SNV/Indel VCFs (Mutect2 + VEP)
         [
             f"results/{run}/{sample}/{sample}.SNV.vcf"
