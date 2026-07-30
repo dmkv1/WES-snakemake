@@ -78,38 +78,21 @@ def _is_paired_tumor(w):
 
 
 rule gatk_haplotypecaller:
+    # Germline SNP discovery. Only ever requested for the run's matched normal:
+    # it genotypes the exome so extract_normal_het_sites can select het BAF
+    # anchors. The paired tumour no longer runs HaplotypeCaller — its ref/alt
+    # depth at these known sites comes from CollectAllelicCounts (pileup, no
+    # assembly) via tumor_baf_allelic_counts / tumor_baf_vcf (#24). Tumour-only
+    # runs never request this output (no BAF track).
     input:
         bam="results/{run}/{sample}/bam/{sample}.bam",
         bai="results/{run}/{sample}/bam/{sample}.bai",
         refg=config["refs"]["genome_human"],
         regions=lambda w: f"work/refs/regions/{probe_dict[w.run][w.sample]}/regions.bed",
-        # Paired tumour only: the matched normal's het sites, used to force-call
-        het_sites=lambda w: (
-            f"work/haplotypecaller/{w.run}/normal_het_sites.vcf.gz"
-            if _is_paired_tumor(w) else []
-        ),
-        het_sites_tbi=lambda w: (
-            f"work/haplotypecaller/{w.run}/normal_het_sites.vcf.gz.tbi"
-            if _is_paired_tumor(w) else []
-        ),
     output:
         vcf="work/haplotypecaller/{run}/{sample}/{sample}.germline.vcf",
         idx="work/haplotypecaller/{run}/{sample}/{sample}.germline.vcf.idx",
     params:
-        # Paired tumour: --alleles force-calls the matched normal's het sites
-        # "regardless of evidence" (GATK 4.6 HaplotypeCaller — no separate
-        # --force-call flag; that is Mutect2-only), so a record with true AD
-        # exists at every het position regardless of tumour copy number — the
-        # BAF track is no longer blanked in aneuploid/LoH regions.
-        # Normal / tumour-only: standard exome calling.
-        target_args=lambda w: (
-            (
-                f"-L work/haplotypecaller/{w.run}/normal_het_sites.vcf.gz "
-                f"--alleles work/haplotypecaller/{w.run}/normal_het_sites.vcf.gz"
-            )
-            if _is_paired_tumor(w)
-            else f"-L work/refs/regions/{probe_dict[w.run][w.sample]}/regions.bed"
-        ),
         ref_path=config["refs"]["path"],
     threads: config["resources"]["threads"]
     resources:
@@ -127,17 +110,153 @@ rule gatk_haplotypecaller:
         HaplotypeCaller \
         -R {input.refg} \
         -I {input.bam} \
-        {params.target_args} \
+        -L {input.regions} \
         -O {output.vcf} \
         --native-pair-hmm-threads {threads} \
         > {log} 2>&1
         """
 
 
+rule tumor_baf_allelic_counts:
+    # #24: tumour-side BAF depth at the matched normal's het sites via pileup
+    # counting instead of HaplotypeCaller's per-active-region re-assembly + HMM.
+    # We only need ref/alt depth at *known* positions, which is exactly what
+    # CollectAllelicCounts (GATK's own allelic-CN tool) provides — much cheaper
+    # than force-calling with HaplotypeCaller --alleles. Paired tumour only.
+    input:
+        bam="results/{run}/{sample}/bam/{sample}.bam",
+        bai="results/{run}/{sample}/bam/{sample}.bai",
+        refg=config["refs"]["genome_human"],
+        het_sites="work/haplotypecaller/{run}/normal_het_sites.vcf.gz",
+        het_sites_tbi="work/haplotypecaller/{run}/normal_het_sites.vcf.gz.tbi",
+    output:
+        tsv="work/haplotypecaller/{run}/{sample}/{sample}.allelicCounts.tsv",
+    resources:
+        java_max_gb=config["resources"]["java_max_gb"],
+        java_min_gb=config["resources"]["java_min_gb"],
+        mem_mb=config["resources"]["mem_mb"],
+    log:
+        "work/logs/CollectAllelicCounts_{run}_{sample}.log",
+    container:
+        config["containers"]["gatk"]
+    shell:
+        """
+        gatk \
+        --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
+        CollectAllelicCounts \
+        -R {input.refg} \
+        -I {input.bam} \
+        -L {input.het_sites} \
+        --minimum-base-quality 20 \
+        -O {output.tsv} \
+        > {log} 2>&1
+        """
+
+
+rule tumor_baf_vcf:
+    # #24: convert CollectAllelicCounts output into the single-sample tumour VCF
+    # that cnvkit_merge_germline_and_filter_hetsnp expects in place of the old
+    # HaplotypeCaller force-call output. REF/ALT and contig header are taken
+    # verbatim from the normal het-site VCF so bcftools merge aligns records
+    # exactly; AD/DP come from the pileup counts; GT is a genuine call from the
+    # observed BAF (mirrors the shape of the former force-call: every record
+    # carries a real genotype + AD).
+    input:
+        het_sites="work/haplotypecaller/{run}/normal_het_sites.vcf.gz",
+        tsv="work/haplotypecaller/{run}/{sample}/{sample}.allelicCounts.tsv",
+    output:
+        vcf="work/haplotypecaller/{run}/{sample}/{sample}.tumor_baf.vcf",
+    params:
+        sample=lambda w: w.sample,
+    run:
+        import gzip
+
+        # Normal het sites: authoritative REF/ALT + contig header lines, in order.
+        contigs = []
+        sites = []  # (chrom, pos, ref, alt)
+        with gzip.open(input.het_sites, "rt") as fh:
+            for line in fh:
+                if line.startswith("##contig="):
+                    contigs.append(line.rstrip("\n"))
+                elif line.startswith("#"):
+                    continue
+                else:
+                    f = line.split("\t")
+                    sites.append((f[0], f[1], f[3], f[4]))
+
+        # CollectAllelicCounts: skip SAM (@) header and the column header row.
+        counts = {}  # (chrom, pos) -> (ref_count, alt_count, ref_nuc, alt_nuc)
+        with open(input.tsv) as fh:
+            for line in fh:
+                if line.startswith("@") or line.startswith("CONTIG\t"):
+                    continue
+                c = line.rstrip("\n").split("\t")
+                counts[(c[0], c[1])] = (int(c[2]), int(c[3]), c[4], c[5])
+
+        def genotype(ref_ad, alt_ad):
+            dp = ref_ad + alt_ad
+            if dp == 0:
+                return "./."
+            baf = alt_ad / dp
+            if baf < 0.1:
+                return "0/0"
+            if baf > 0.9:
+                return "1/1"
+            return "0/1"
+
+        with open(output.vcf, "w") as out:
+            out.write("##fileformat=VCFv4.2\n")
+            for c in contigs:
+                out.write(c + "\n")
+            out.write(
+                '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+            )
+            out.write(
+                '##FORMAT=<ID=AD,Number=R,Type=Integer,'
+                'Description="Allelic depths for the ref and alt alleles">\n'
+            )
+            out.write(
+                '##FORMAT=<ID=DP,Number=1,Type=Integer,'
+                'Description="Approximate read depth">\n'
+            )
+            out.write(
+                "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"
+                + params.sample
+                + "\n"
+            )
+            for chrom, pos, ref, alt in sites:
+                rc, ac, ref_nuc, alt_nuc = counts.get((chrom, pos), (0, 0, ref, alt))
+                ref_ad = rc
+                # CollectAllelicCounts reports the single highest-count alt base;
+                # only credit it when it is the normal's alt (at near-hom sites a
+                # noise base may be reported, but its count is ~0 either way).
+                alt_ad = ac if alt_nuc == alt else 0
+                dp = ref_ad + alt_ad
+                gt = genotype(ref_ad, alt_ad)
+                out.write(
+                    "\t".join(
+                        [
+                            chrom,
+                            pos,
+                            ".",
+                            ref,
+                            alt,
+                            ".",
+                            ".",
+                            ".",
+                            "GT:AD:DP",
+                            f"{gt}:{ref_ad},{alt_ad}:{dp}",
+                        ]
+                    )
+                    + "\n"
+                )
+
+
 rule extract_normal_het_sites:
-    """Heterozygous biallelic SNP sites from the matched normal. Drives the
-    tumour force-call (--alleles) so BAF sites survive in CNV/LoH regions.
-    Mirrors the normal-side criteria of cnvkit_merge_germline_and_filter_hetsnp."""
+    """Heterozygous biallelic SNP sites from the matched normal. Seeds the
+    tumour CollectAllelicCounts -L (#24) so BAF sites survive in CNV/LoH
+    regions. Mirrors the normal-side criteria of
+    cnvkit_merge_germline_and_filter_hetsnp."""
     input:
         normal=lambda w: (
             f"work/haplotypecaller/{w.run}/{runs_dict[w.run]['normal']}/"
@@ -171,7 +290,7 @@ rule cnvkit_merge_germline_and_filter_hetsnp:
             if not is_tumor_only(w) else []
         ),
         tumor=lambda w: (
-            f"work/haplotypecaller/{w.run}/{w.sample}/{w.sample}.germline.vcf"
+            f"work/haplotypecaller/{w.run}/{w.sample}/{w.sample}.tumor_baf.vcf"
             if not is_tumor_only(w) else []
         ),
     output:
@@ -196,7 +315,7 @@ rule cnvkit_merge_germline_and_filter_hetsnp:
             # when multiple tumors share the same control
             TMPDIR=$(dirname {output.vcf})
             NORMAL_GZ="$TMPDIR/{params.normal}.germline.vcf.gz"
-            TUMOR_GZ="$TMPDIR/{params.tumor}.germline.vcf.gz"
+            TUMOR_GZ="$TMPDIR/{params.tumor}.tumor_baf.vcf.gz"
 
             bgzip -c {input.normal} > "$NORMAL_GZ" 2> {log}
             tabix -f -p vcf "$NORMAL_GZ" 2>> {log}

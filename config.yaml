@@ -1,4 +1,4 @@
-samplesheet: "samplesheet_test_small.csv"
+samplesheet: "samplesheet_test.csv"
 telegram_bot_env: "~/.telegram_bot.env"  # Path to .telegram_bot.env file; leave empty to disable notifications
 run_id: "dev test"            # Human-readable label prepended to Telegram notifications
 

@@ -6,52 +6,6 @@
 
 ## Good-to-haves (open, enhancements / non-blocking)
 
-13. **No orthogonal purity/ploidy estimator (FACETS)** — PureCN is now wired in and is the only estimator (see #25 in Done); purity defaults to the samplesheet constant until `params.cnv.purity_source` is flipped to `"purecn"` in config, and even then falls back to the samplesheet value for any sample PureCN flags as low-confidence. There is still no second, independent estimate to catch a case where PureCN is *not* flagged but simply wrong. Add **FACETS** (WES tumor/normal, allele-specific CN + purity/ploidy from depth-ratio + BAF) as a second, orthogonal estimator so purity can be reported as a "two methods agree" number rather than a single tool's opinion. Cheap interim cross-check available with no new tool: `2 × modal VAF of clonal PASS SNVs in CN-neutral CNVkit segments ≈ purity` (Mutect2 VCF + CNVkit `.cns`, both already produced) — worth running before investing in FACETS, since the published PureCN/FACETS/ABSOLUTE benchmark (Oh et al., bioRxiv 552711) found discordance concentrated in low-purity, low-coverage samples that FACETS would likely find equally ambiguous rather than resolve.
-
-19. **No MAF-format SNV output for maftools / cohort-level analysis** — current SNV outputs are per-sample VEP-annotated VCF (`{sample}.SNV.vcf`) and the merged Excel/TSV output. Both are fine for per-sample inspection but unusable as input to `maftools` (oncoplots, mutational signatures, TMB summaries, somatic interactions, lollipop plots, etc.), which is the standard downstream entry point for cohort SNV analysis.
-
-    **STALE — roadmap below predates the Funcotator→VEP migration (#23, done).** It assumed Funcotator's native `--output-file-format MAF` emitter; that path no longer exists. Re-scope to `vcf2maf` (VEP-based) before implementing — the sample-ID wiring and cohort-aggregation steps below still apply, but step 1's Funcotator MAF call must become a `vcf2maf` call over the VEP-annotated VCF.
-
-    **Implementation roadmap (needs re-scoping, see above):**
-
-    1. **Per-sample MAF rule** in `snv_calling_mutect2.smk`. Two options:
-       - *(preferred)* Add a sibling rule `funcotate_maf` that consumes the same PASS-filtered, AF-filtered (tumor-only) VCF as the existing `funcotate` rule and runs Funcotator a second time with `--output-file-format MAF`. Keeps the VCF path byte-identical; cheap re-run of just the annotation step.
-       - *(alternative)* Add a second `output:` to the existing rule and emit both formats in one Funcotator call — slightly faster but couples the two outputs (any future change to one re-triggers the other). Prefer option 1 for separability.
-
-    2. **Sample-ID wiring.** Funcotator MAF requires identity columns the VCF mode doesn't:
-       - `--tumor-id {sample}` (always)
-       - `--normal-id {normal}` — paired mode only; pull via the same helper used by `run_mutect2` (e.g. `_get_normal_sample(wildcards)`). Tumor-only: omit the flag; maftools handles single-sample MAFs fine.
-       - `--sequence-dictionary` already implicit via the reference fasta `.dict`; no extra wiring.
-
-    3. **Output path.** `results/{run}/{sample}/{sample}.SNV.maf` — sibling of the existing `.SNV.vcf`. Add to the `all` target and to the per-sample output list referenced by `combine_results.R` inputs (the R script itself does not need to read the MAF; just declare it so Snakemake builds it).
-
-    4. **Cohort aggregation rule.** New rule `aggregate_cohort_maf` (top-level `results/cohort.maf`):
-       - Inputs: all per-sample `{sample}.SNV.maf` for tumor/PDX samples (exclude CTRL — they have no SNV MAF anyway).
-       - Shell: take header (`#version` line + column header) from the first file, then `tail -n +N` from each (skipping both comment and header). ~5 lines of awk or grep -v.
-       - One file, no per-run subdirectory — maftools wants a single cohort MAF.
-
-    5. **R verification snippet** (not part of pipeline, just for the verification run):
-       ```r
-       library(maftools)
-       maf <- read.maf("results/cohort.maf")
-       plotmafSummary(maf); oncoplot(maf, top = 30)
-       ```
-
-    **Caveats to document in the rule comment / README:**
-    - MAF's column set is fixed; the rich extra Funcotator annotations currently preserved in the VCF/xlsx (full gnomAD_exome + gnomAD_genome AFs, ClinVar significance, COSMIC details, HGNC fields, etc.) get folded into MAF standard columns or pushed into `Other_Transcripts` — some are lost. MAF is **additional**, not a replacement: keep the VCF and the xlsx workbook unchanged.
-    - Funcotator MAF emits one row per *transcript-effect*, not one per variant — `maftools::read.maf` collapses to canonical by default, but be aware when grep-ing the raw MAF.
-    - Tumor-only entries will have `Matched_Norm_Sample_Barcode = NONE`; fine for maftools, but flag if downstream code assumes a normal exists.
-    - PDX samples: MAF will be emitted on the xenograft-filtered (xengsort graft) BAM, same as the VCF — no special handling needed.
-
-    **Estimated effort:** ~30 min implementation (one rule + one aggregation rule + samplesheet/target wiring) + one end-to-end verification run on an existing patient (e.g. `P005_PT`, already validated for #4/#5/#6) to confirm the MAF loads cleanly in maftools. No new containers, no new reference resources, no DAG restructuring.
-
-21. **Add Delly as a second SV caller, merged with Manta.** WES-smk is Manta-only; BALSAMIC runs Manta + Delly merged via SVDB. **Cohort-specific payoff:** DLBCL is defined by IG translocations (BCL2/BCL6/MYC) and Manta and Delly have non-overlapping breakpoint sensitivity — a consensus/union materially improves translocation recall. This is the highest-value caller addition for this cohort (higher than a second SNV caller).
-    - **Plan:** new `run_delly` rule (`delly call -x <exclude.bed>`, paired = tumor+normal with somatic pre-filter `delly filter -f somatic -s samples.tsv`; tumor-only = single-sample); PASS-filter; merge Manta + Delly with SVDB (`--no_intra --bnd_distance 5000 --overlap 0.80`, priority list) or a lighter `bcftools`/survivor merge; feed the merged VCF to the existing `annotate_sv` (AnnotSV) rule in `sv_calling_manta.smk`.
-    - **Resources:** Delly exclude-regions BED for hg38 (ships with Delly). No PON required for somatic Delly. (Delly-CNV is a separate optional path — not in scope here; CNV stays CNVkit/PureCN.)
-    - **Effort:** medium. New caller + merge step + AnnotSV input swap. Verify on a known-translocation case.
-
-24. **`gatk_haplotypecaller`'s tumor-side force-call is heavier than needed for BAF extraction** — the paired-tumor call added for #6 already restricts `-L` to the normal's het sites, so it's much cheaper than the normal's full-exome call, but HaplotypeCaller still does local re-assembly + HMM realignment per active region even when restricted to single-bp intervals — overkill for what's actually needed (ref/alt depth at *known* positions, not fresh genotyping). GATK's `CollectAllelicCounts` (pileup-based, no assembly) is the tool built for exactly this — it's what GATK's own ModelSegments/allelic-CN workflow uses. The common-SNP resource already in config (`contamination_resource`, used for `GetPileupSummaries`/#5) could seed candidate sites for both normal and tumor, skipping HaplotypeCaller's assembly cost on both sides, not just the tumor's. Not a correctness bug — #6 is verified and working — this is a speed optimization, lower priority than the items above.
-
 ---
 
 ## Multi-lane (parked — branch `multi-lane`)
@@ -61,6 +15,10 @@
 ---
 
 ## Done
+
+24. ~~**`gatk_haplotypecaller`'s tumor-side force-call is heavier than needed for BAF extraction**~~ ✅ — fixed (tumour-side only) in `cnv_calling_cnvkit.smk`. The paired-tumour HaplotypeCaller `--alleles` force-call is replaced by two new rules: `tumor_baf_allelic_counts` (GATK `CollectAllelicCounts`, pileup, no assembly/HMM, `-L` = the normal's het sites, `--minimum-base-quality 20`) → `tumor_baf_vcf` (inline `run:`, stdlib only — like `filter_chromosomes`/`purecn_tumor_coverage`) which joins the counts against `normal_het_sites.vcf.gz`, reusing the normal's REF/ALT + contig header verbatim so `bcftools merge` aligns records exactly. AD = (ref_count, alt_count-if-alt-matches-else-0); DP = sum; GT is a genuine call from the observed BAF (0/0 <0.1, 1/1 >0.9, else 0/1). `gatk_haplotypecaller` lost its paired-tumour branch — it is now plain-exome and only ever requested for the run's matched normal (`extract_normal_het_sites` stays, now seeding CollectAllelicCounts `-L`). `cnvkit_merge_germline_and_filter_hetsnp`'s tumour input points at `.tumor_baf.vcf`; the merge/filter, cnvkit, and PureCN contracts are unchanged.
+    - **Scope decision:** tumour-side only. #24 floated seeding *both* sides from the common-SNP resource (`contamination_resource`), but the normal's HaplotypeCaller call is the genotype authority `extract_normal_het_sites` uses to pick het anchors (`GT=='0/1'`); switching the normal to pileup would force BAF-threshold het-inference — a behaviour change to the exact BAF track #6 validated. Left as a possible follow-up, not done.
+    - **Verified end-to-end** (P004/P013/P062 paired, 8-core host run): merged VCF valid (bcftools parses all records; normal `GT:AD:DP:GQ:PL` + tumour `GT:AD:DP` reconciled by `bcftools merge -m none`); conversion lossless (`tumor_baf` record count == `normal_het` count, 47428/47428); LoH/aneuploid skew preserved (tumour GT dist ≈ 44.8k `0/1` / 2.1k `0/0` / 405 `1/1`; ~1129 strongly-skewed BAF>0.9|<0.1 sites at DP>30 retained with real skewed AD — the #6 signal is not blanked); het-site retention 96% (P004/P013), matching #6's ~98% (delta = tumour `DP[1]>10` filter). Tumour-only (P020) correctly gets the empty placeholder.
 
 1. ~~**No UMI-aware trimming or deduplication for V8+UTR samples**~~ ✅ — investigated, **not a pipeline bug; no sample requires UMI removal**. The V8+UTR prep (SureSelect XT HS, G9702-90005) does generate a 10-bp i5 MBC, but CLIP/BaseSpace demux delivers FASTQs with the MBC **dropped at FASTQ generation**: i5 written as a constant 8-bp *sample* index, no I2 read, raw binned NextSeq qualities, PCR-duplicate load consistent with un-collapsed data (triangulated across three independent checks). The barcode is physically absent from every delivered FASTQ, so coordinate-based `MarkDuplicates` is the only valid option and is exactly what runs — existing results are **not compromised on the UMI axis**. `fastp` defaults (PE adapter overlap-trim, auto polyG for NextSeq, quality/N/length filter) are adequate for non-UMI WES. Recovery is possible *only* by regenerating FASTQs from BaseSpace with i5/MBC retrieval (facility request, not a code change). Detail: memory `reference_wes_umi_demux.md`.
    - *Optional, non-blocking future-proofing:* add an explicit `umi` samplesheet column (orthogonal to `probes`) gating a dormant fgbio path; set `umi=false` for all current rows (byte-identical behavior, no remap) so correctly-demuxed future runs work without touching existing results.
@@ -138,5 +96,11 @@
 8. ~~**xengsort mouse-read stats not captured**~~ ✅ — fixed: MultiQC's xengsort module named each PDX sample's row after the literal `--out` path printed in the classify log, not the log filename, so it never merged with that sample's other QC rows. `run_xengsort` now rewrites the log in place (`sed -i "s#{params.outprefix}#{wildcards.sample}#g"`) after classification, and `multiqc` takes each sample's graft fastq as an explicit input so `run_xengsort` is DAG-guaranteed to finish (and the temp() graft fastqs survive) before the report is built. Murine/graft read fractions now appear merged into the per-sample MultiQC row instead of being lost.
 
 12. ~~**PureCN receives pre-segmented `.cns` + `--fun-segmentation Hclust`**~~ ✅ — investigated, **not a bug; the original claim was wrong**. Checked against PureCN's own CNVkit integration docs (Quick-Start guide) and the maintainer's GitHub issue thread: feeding a `--seg-file` (exported from CNVkit's `.cns`) alongside the raw `.cnr` and using `--fun-segmentation Hclust` *is* PureCN's documented recommended recipe for CNVkit users — `Hclust` re-segments using germline BAFs on top of CNVkit's boundaries by design, a deliberate middle ground, not a contradiction. `cnvkit_export_seg` and the `--seg-file`/`Hclust` flags in `purecn_run` are unchanged by #25's rewire.
+
+13. ~~**No orthogonal purity/ploidy estimator (FACETS)**~~ ✅ — **dropped, not implemented; PureCN is retained as the sole estimator.** FACETS was evaluated and rejected: on this WES cohort it produced noisy fits that its own diagnostics self-flagged as unreliable, even with `--targets`, and did not resolve the low-purity/low-coverage discordance it was proposed to catch — exactly the ambiguous-sample regime the Oh et al. benchmark predicted. PureCN (wired in #25) wins and stays the only purity/ploidy tool. Do not re-add FACETS.
+
+21. ~~**Add Delly as a second SV caller, merged with Manta**~~ ✅ — done: `run_delly` (paired = tumor+normal with `delly filter -f somatic`; tumor-only = single-sample) + PASS-filter, merged with Manta via **SURVIVOR** into a consensus SV set, with **AnnotSV** run on the merged VCF. Report is emitted full-mode only, with a 3 Mb size cap on SV records. Landed in commit 974d021.
+
+19. ~~**No MAF-format SNV output for maftools / cohort-level analysis**~~ ✅ — done: new `cohort_maf` rule (`integrate_results.smk`) runs `workflow/scripts/combined_to_maf.R` to derive a GDC/maftools-compatible `results/combined/cohort.maf` from the already-built `combined_snvs.tsv`, added to `rule all`. Isolated downstream of `merge_results` (a failure leaves the other `combined_*` outputs intact). The stale Funcotator-MAF roadmap was dropped — the script parses the VEP-annotated combined table directly: SO-term→`Variant_Classification` map and effect-priority ordering transcribed from mskcc/vcf2maf, alleles re-derived to MAF convention (indel trimming, `-`, recomputed Start/End). MAF is additional — VCF and xlsx unchanged. Verified: loads cleanly in maftools 2.28.0 (8 samples, 7565 variants; `read.maf`/`getSampleSummary`/`getGeneSummary` all work), allele conventions and coordinates spot-checked, type counts reconcile exactly with the source table.
 
 26. ~~**Conda envs under-pinned — reproducibility risk**~~ ✅ — fixed: `envs/pysam.yaml` now pins `python=3.12` alongside `pysam=0.24.0` (previously no Python version was pinned, so the solver had picked a free-threaded `python-3.14.6` build that forced the GIL back on at import). `envs/r_vcf.yaml` now pins `r-base=4.3.3`, `bioconductor-variantannotation=1.48.1`, `r-tidyverse=2.0.0`, `r-openxlsx=4.2.8` (previously only `r-base=4.3` was pinned, the other three were unpinned). Verified via a full wet-run on host. `envs/purecn.yaml`'s unpinned `r-optparse` left as-is (moot while `purecn.smk` is dead code, #25). Conda build-string pinning remains an unresolved deeper gap, tracked separately in `portability-todo.md`.
