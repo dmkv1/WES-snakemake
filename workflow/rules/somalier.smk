@@ -47,7 +47,12 @@ rule somalier_ped_cohort:
         with open(output.ped, "w") as fh:
             for run in runs_dict:
                 for sample in get_all_samples_for_run(run):
-                    gender = samples.loc[samples["sample"] == sample, "gender"].iloc[0]
+                    # Keyed on (ID, sample): a sample name alone can recur across
+                    # runs, and matching on it would take another run's gender.
+                    gender = samples.loc[
+                        (samples["ID"] == run) & (samples["sample"] == sample),
+                        "gender",
+                    ].iloc[0]
                     fh.write(f"{run}\t{sample}\t0\t0\t{sex_code.get(gender, '0')}\t0\n")
 
 
@@ -84,7 +89,7 @@ rule somalier_summarise:
     sample relatedness heatmap. Report-only; no DAG gating."""
     input:
         pairs="results/qc/somalier/cohort/cohort.pairs.tsv",
-        samplesheet=config["samplesheet"],
+        samples_meta="results/metadata/samples.tsv",
     output:
         tsv="results/combined/combined_relatedness.tsv",
         heatmap_png="results/combined/relatedness_heatmap.png",

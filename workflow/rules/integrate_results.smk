@@ -43,13 +43,14 @@ rule merge_results:
             for sample in runs_dict[run]["tumors"]
         ],
         relatedness_tsv="results/combined/combined_relatedness.tsv",
+        # An input rather than a param so editing the samplesheet retriggers the
+        # merge; as a param its content could go stale against the results.
+        samples_meta="results/metadata/samples.tsv",
     output:
         snv_tsv="results/combined/combined_snvs.tsv",
         cnv_tsv="results/combined/combined_cnvs.tsv",
         sv_tsv="results/combined/combined_svs.tsv",
         qc_tsv="results/combined/combined_qc.tsv",
-    params:
-        samplesheet=config["samplesheet"],
     conda:
         "../envs/r_vcf.yaml"
     script:

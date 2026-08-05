@@ -7,14 +7,21 @@ suppressPackageStartupMessages({
   library(readr)
 })
 
-samplesheet <- snakemake@params[["samplesheet"]]
+samples_meta <- snakemake@input[["samples_meta"]]
 
-# Load samplesheet for metadata (drop FASTQ paths — not needed). The samplesheet
-# capture-kit column is already named 'capture_kit' (distinct from CNVkit's
-# per-segment 'probes' probe-count column, so the join won't collide).
-meta <- read_csv(samplesheet, show_col_types = FALSE) %>%
-  select(-any_of(c("fq1", "fq2"))) %>%
+# Per-sample metadata comes from the collapsed sample table, not the raw
+# samplesheet: a samplesheet has one row per FASTQ pair, so a multi-lane sample
+# appears several times and joining against it would multiply every result row
+# by that sample's unit count. The capture-kit column is already named
+# 'capture_kit' (distinct from CNVkit's per-segment 'probes' probe-count
+# column, so the join won't collide).
+meta <- read_tsv(samples_meta, show_col_types = FALSE) %>%
   rename(sID = sample)
+
+# The table is built one row per (ID, sample) and validated there. Asserting it
+# again here is what keeps a future change of source from silently reinstating
+# the fan-out.
+stopifnot(!any(duplicated(meta[c("ID", "sID")])))
 
 # Row-bind one data type's per-sample CSVs, tag with sample/run, and join
 # samplesheet metadata (moved to the front of the result).

@@ -79,19 +79,64 @@ Create comma-separated table `samplesheet.csv` with columns:
 * **sample**: Sample identifier, unique within the given ID.
 * **sample_type**: Sample type — `CTRL` for matched normal/germline, `PDX` for xenograft, any other value is treated as a tumor sample.
 * **gender**: `f` for female, `m` for male.
-* **probes**: Exome library kit version. Must match a key in `probe_configs` in `config.yaml`.
-* **purity**: Known or estimated tumor cell fraction (0–1). Used for CNVkit copy number calling and CCF calculation.
-* **fq1**: Full path to R1 FASTQ file.
-* **fq2**: Full path to R2 FASTQ file.
+* **capture_kit**: Exome library kit version. Must match a key in `probe_configs` in `config.yaml`.
+* **tumor_fraction**: Known or measured tumor cell fraction, in `(0,1]`. Blank or `NA` means unknown, and purity falls back to PureCN. `0` is not valid.
+* **fq1**: Path to the R1 FASTQ, or a glob matching several (see below).
+* **fq2**: Path to the R2 FASTQ, matching `fq1`.
 
 Example format:
 
-| ID   | sample   | sample_type | gender | probes | purity | fq1 | fq2 |
-|------|----------|-------------|--------|--------|--------|-----|-----|
-| Pt01 | Normal01 | CTRL        | m      | V8+UTR | 0      | /path/to/Normal01_R1.fastq.gz | /path/to/Normal01_R2.fastq.gz |
-| Pt01 | Tumor01  | Tumor       | m      | V8+UTR | 0.7    | /path/to/Tumor01_R1.fastq.gz  | /path/to/Tumor01_R2.fastq.gz  |
-| Pt01 | Tumor02  | Tumor       | m      | V8+UTR | 0.3    | /path/to/Tumor02_R1.fastq.gz  | /path/to/Tumor02_R2.fastq.gz  |
-| Pt01 | Model01  | PDX         | m      | V8+UTR | 1      | /path/to/Model01_R1.fastq.gz  | /path/to/Model01_R2.fastq.gz  |
+| ID   | sample   | sample_type | gender | capture_kit | tumor_fraction | fq1 | fq2 |
+|------|----------|-------------|--------|-------------|----------------|-----|-----|
+| Pt01 | Normal01 | CTRL        | m      | V8+UTR      |                | /path/to/Normal01_R1.fastq.gz | /path/to/Normal01_R2.fastq.gz |
+| Pt01 | Tumor01  | Tumor       | m      | V8+UTR      | 0.7            | /path/to/Tumor01_R1.fastq.gz  | /path/to/Tumor01_R2.fastq.gz  |
+| Pt01 | Tumor02  | Tumor       | m      | V8+UTR      | 0.3            | /path/to/Tumor02_R1.fastq.gz  | /path/to/Tumor02_R2.fastq.gz  |
+| Pt01 | Model01  | PDX         | m      | V8+UTR      | 1              | /path/to/Model01_R1.fastq.gz  | /path/to/Model01_R2.fastq.gz  |
+
+#### Multi-lane samples and read groups
+
+A sample sequenced across several lanes is aligned once per lane, each with its
+own read group, and the per-lane BAMs are gathered by `MarkDuplicates`. There
+are two ways to express that:
+
+* **One row, globbed paths** — `fq1: /path/SAMPLE_S3_L*_R1_001.fastq.gz`. The
+  glob expands to one *unit* per matching pair. This is what the lab's ingest
+  emits. A plain path is a glob matching one file, so single-file rows are just
+  the one-unit case.
+* **One row per FASTQ pair** — repeat the sample across rows with the same `ID`
+  and `sample`. The per-sample columns above must agree on every row of a
+  sample, or the run stops with an error naming the conflict.
+
+Read groups are derived from the data by default. Four optional columns
+override that per row, and are only needed when the data cannot say:
+
+* **flowcell**, **lane**, **barcode** — asserted rather than derived. A row
+  carrying an explicit `lane` must name exactly one FASTQ pair.
+* **library** — the physical DNA library (`LB`). Defaults to the sample name,
+  which assumes one library. Set it when a sample has two independent preps:
+  `MarkDuplicates` only calls duplicates *within* a library, so leaving two
+  preps sharing one `LB` discards real independent evidence as PCR duplicates.
+  Resequencing an existing library is *not* a new library.
+
+`results/metadata/units.tsv` records how each unit resolved, including the exact
+`@RG` line, and the MultiQC report carries the same as a **Read groups** table.
+The `rg_source` column there is the provenance:
+
+| `rg_source` | meaning |
+|---|---|
+| `sheet` | flowcell and lane both asserted by the samplesheet |
+| `header+lane` | flowcell from the reads, lane from the filename — the clean per-lane case |
+| `header_nolane` | flowcell known, lane unknown. **The file may be externally lane-merged**, so its read group is per file, not per lane |
+| `filename` | no parseable read header; lane taken from the filename |
+| `positional` | no provenance at all; units numbered in order |
+
+The lane is never taken from a read header. An externally merged FASTQ can begin
+on one lane and end on another, so its first record says nothing about the rest
+of the file. The header's lane is still read, and disagreeing with the filename
+is reported as a warning — that disagreement is the signal that a file spans
+lanes or was renamed. Setting `params.rg.strict` in `config.yaml` turns those
+warnings into errors, which is appropriate when an operator curates the sheet
+and wrong for unattended deployments, where degrading is better than blocking.
 
 #### Tumor–Normal Paired Mode
 

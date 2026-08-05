@@ -17,14 +17,18 @@ suppressPackageStartupMessages({
   library(ggplot2)
 })
 
-pairs_file  <- snakemake@input[["pairs"]]
-samplesheet <- snakemake@input[["samplesheet"]]
+pairs_file   <- snakemake@input[["pairs"]]
+samples_meta <- snakemake@input[["samples_meta"]]
 ibs0_frac_max    <- as.numeric(snakemake@params[["ibs0_frac_max"]])
 relatedness_warn <- as.numeric(snakemake@params[["relatedness_warn"]])
 unrelated_max    <- as.numeric(snakemake@params[["unrelated_max"]])
 
-# sample -> patient (samplesheet ID column drives the same_patient expectation)
-meta <- read_csv(samplesheet, show_col_types = FALSE)
+# sample -> patient (the ID column drives the same_patient expectation). Read
+# from the collapsed sample table rather than the samplesheet: the samplesheet
+# has one row per FASTQ pair, which would put a multi-lane sample into this
+# lookup several times and silently resolve to whichever entry came first.
+meta <- read_tsv(samples_meta, show_col_types = FALSE)
+stopifnot(!any(duplicated(meta[c("ID", "sample")])))
 patient_of <- setNames(as.character(meta$ID), meta$sample)
 
 pairs <- read_tsv(pairs_file, show_col_types = FALSE)

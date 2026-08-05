@@ -1,9 +1,18 @@
-samplesheet: "samplesheet_test.csv"
+samplesheet: "samplesheet_test_small.csv"
 telegram_bot_env: "~/.telegram_bot.env"  # Path to .telegram_bot.env file; leave empty to disable notifications
 run_id: "dev test"            # Human-readable label prepended to Telegram notifications
 
-# Container images (pinned). Must match WES-PON-smk so PON normals and caller
-# tumors are preprocessed by the identical GATK build (byte-identical BAMs).
+# Container images (pinned), matching WES-PON-smk so PON normals and caller
+# tumors run the same GATK build.
+#
+# The preprocessing chains are no longer identical: this pipeline aligns per
+# unit with real read groups, fixes mates with samtools, and marks duplicates on
+# query-grouped input before sorting (GATK Best Practices ordering), while
+# WES-PON-smk still runs bwa -> AddOrReplaceReadGroups -> FixMateInformation ->
+# coordinate MarkDuplicates. Supplementary and secondary duplicate marking
+# therefore differs slightly, which shifts coverage, which is what the CNVkit
+# reference and the Mutect2 PON were built from. Accepted deliberately; porting
+# the chain to WES-PON-smk and rebuilding both PONs is tracked separately.
 containers:
   gatk: "docker://broadinstitute/gatk:4.6.2.0"
   vep: "docker://ensemblorg/ensembl-vep:release_116.0"
@@ -19,13 +28,11 @@ containers:
 #                            consumer in this pipeline yet.
 probe_configs:
   "V6+UTR":
-    library_prep: "SureSelectV6UTR"
     covered_bedfile:        "/mnt/data/NGS/refs/SureSelectHumanAllExon/V6UTR/S07604624_Covered.bed"
     target_regions_bedfile: "/mnt/data/NGS/refs/SureSelectHumanAllExon/V6UTR/S07604624_Regions.bed"
     cnvkit_targets:     "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/targets.bed"
     cnvkit_antitargets: "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/antitargets.bed"
   "V8+UTR":
-    library_prep: "SureSelectV8UTR"
     covered_bedfile:        "/mnt/data/NGS/refs/SureSelectHumanAllExon/V8UTR/S33613271_Covered.bed"
     target_regions_bedfile: "/mnt/data/NGS/refs/SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
     cnvkit_targets:     "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/targets.bed"
@@ -67,6 +74,15 @@ refs:
   somalier_sites: "/mnt/data/NGS/refs/somalier/sites.hg38.vcf.gz"
 
 params:
+    rg:
+      # Read-group resolution: how to treat a samplesheet that contradicts the
+      # data (flowcell, or a lane that disagrees with the filename or the
+      # reads). true stops the run, which is right when an operator curates the
+      # sheet and can fix it. false records a warning and carries on, which is
+      # right for unattended deployments where a degraded read group beats no
+      # result. Provenance is reported per unit either way, as rg_source in
+      # results/metadata/units.tsv and the MultiQC report.
+      strict: true
     xengsort:
       index_size: 4500000000
       index_fill: 0.88
@@ -151,5 +167,9 @@ resources:
   java_max_gb: 128
   java_min_gb: 32
   mem_mb: 163840       # java_max_gb + 25% non-heap overhead, for scheduler mem_mb tracking
+  # Per-thread sort buffer for `samtools sort`. Set explicitly because the
+  # samtools default (768M) is per thread, so it scales with -@ into a spike
+  # far larger than intended.
+  sort_mem: "2G"
   manta_max_gb: 128
   manta_mem_mb: 163840 # manta_max_gb + 25% overhead, for scheduler mem_mb tracking

@@ -1,12 +1,17 @@
 # Consolidate each sample's MultiQC rows (mirrors WES-PON-smk):
-#   - fastp/fastqc rows are per lane ({sample}.{lane}); "_fastp" is stripped so
-#     the fastp row keeps the {sample}.{lane} name instead of fastp's read guess.
-#   - MarkDuplicates gathers per-lane inputs named {sample}.{lane}.sorted.bam;
-#     the regex collapses that suffix so the dup-metrics row lands on {sample}.
+#   - fastp/fastqc rows are per unit ({sample}.{unit}, where unit is L001 for a
+#     known lane or u1 positionally); "_fastp" is stripped so the fastp row keeps
+#     the {sample}.{unit} name instead of fastp's read guess.
+#   - MarkDuplicates gathers per-unit inputs named {sample}.{unit}.qgrp.bam and
+#     names its rows after them; the regex collapses that suffix so the
+#     dup-metrics row lands on {sample}. Verify empirically after a run: the
+#     Picard module derives the row name from the metrics file's INPUT field,
+#     which now lists one path per unit rather than a single BAM.
 use_filename_as_sample_name:
   - fastp
 extra_fn_clean_exts:
   - "_fastp"
   - type: regex
-    pattern: "\\.L\\d+\\.sorted$"
-  - ".sorted"
+    pattern: "\\.(L\\d+|u\\d+)\\.qgrp$"
+  - ".qgrp"
+  - ".md"

@@ -53,13 +53,13 @@ rule bed_to_interval_list:
 
 rule fastqc:
     input:
-        fq1="work/fastq/{run}/{sample}/{sample}.{lane}_R1.fq.gz",
-        fq2="work/fastq/{run}/{sample}/{sample}.{lane}_R2.fq.gz",
+        fq1="work/fastq/{run}/{sample}/{sample}.{unit}_R1.fq.gz",
+        fq2="work/fastq/{run}/{sample}/{sample}.{unit}_R2.fq.gz",
     output:
-        zip1="results/qc/fastqc/{run}/{sample}.{lane}_R1_fastqc.zip",
-        zip2="results/qc/fastqc/{run}/{sample}.{lane}_R2_fastqc.zip",
+        zip1="results/qc/fastqc/{run}/{sample}.{unit}_R1_fastqc.zip",
+        zip2="results/qc/fastqc/{run}/{sample}.{unit}_R2_fastqc.zip",
     log:
-        "work/logs/fastqc_{run}_{sample}.{lane}.log",
+        "work/logs/fastqc_{run}_{sample}.{unit}.log",
     conda:
         "../envs/qc.yaml"
     threads: 2
@@ -104,16 +104,16 @@ rule collect_hs_metrics:
 rule multiqc:
     input:
         fastp_json=[
-            f"results/qc/fastp/{run}/{sample}.{lane}_fastp.json"
+            f"results/qc/fastp/{run}/{sample}.{unit}_fastp.json"
             for run in runs_dict
             for sample in get_all_samples_for_run(run)
-            for lane in get_lanes(run, sample)
+            for unit in get_units(run, sample)
         ],
         fastqc_zip=[
-            f"results/qc/fastqc/{run}/{sample}.{lane}_R{read}_fastqc.zip"
+            f"results/qc/fastqc/{run}/{sample}.{unit}_R{read}_fastqc.zip"
             for run in runs_dict
             for sample in get_all_samples_for_run(run)
-            for lane in get_lanes(run, sample)
+            for unit in get_units(run, sample)
             for read in (1, 2)
         ],
         dupl_metrics=[
@@ -138,11 +138,12 @@ rule multiqc:
         # forces run_xengsort to complete before multiqc; also keeps its temp() graft fastqs
         # around until multiqc runs instead of being deleted right after bwa_map consumes them
         xengsort_graft=[
-            f"work/fastq/{run}/{sample}/{sample}.{lane}.xengsort-graft.1.fq.gz"
+            f"work/fastq/{run}/{sample}/{sample}.{unit}.xengsort-graft.1.fq.gz"
             for run in runs_dict
             for sample in pdx_dict.get(run, [])
-            for lane in get_lanes(run, sample)
+            for unit in get_units(run, sample)
         ],
+        units_mqc="results/qc/units_rg_mqc.tsv",
         config="multiqc_config.yaml",
     output:
         "results/qc/multiqc_report.html",

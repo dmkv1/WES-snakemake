@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import re
-import glob
+import sys
 
 
 configfile: "config.yaml"
@@ -10,19 +10,40 @@ bind_paths = ",".join([config["refs"]["path"], config["panel_of_normals"]["path"
 os.environ["APPTAINER_BIND"] = bind_paths
 os.environ["SINGULARITY_BIND"] = bind_paths
 
-samples = pd.read_csv(config["samplesheet"])
+sys.path.insert(0, os.path.dirname(workflow.snakefile))
+from workflow.scripts.units import (
+    build_units,
+    unit_index as _build_unit_index,
+    units_by_sample as _build_units_by_sample,
+)
+
+sheet = pd.read_csv(config["samplesheet"])
 
 # Run IDs feed the `{run}_{sample}` file-naming scheme (metrics, logs). An ID
 # containing '_', '.' or '/' would make that split ambiguous, so reject it up
 # front with a clear error instead of failing silently downstream.
 bad_ids = sorted(
-    {str(x) for x in samples["ID"].dropna().unique() if re.search(r"[_./]", str(x))}
+    {str(x) for x in sheet["ID"].dropna().unique() if re.search(r"[_./]", str(x))}
 )
 if bad_ids:
     raise ValueError(
         "Run ID(s) contain '_', '.' or '/', which collide with the "
         f"'{{run}}_{{sample}}' file naming: {', '.join(bad_ids)}"
     )
+
+# Resolve the samplesheet into alignment units and a validated per-sample table.
+# A row naming a file pair yields one unit; a row whose fq1/fq2 are globs (what
+# wesingest emits) yields one per pair. Read groups are derived from the data
+# and overridden by the optional flowcell/lane/library/barcode columns -- see
+# workflow/scripts/units.py for the resolution ladder.
+units, samples, rg_warnings = build_units(
+    sheet, strict=config.get("params", {}).get("rg", {}).get("strict", True)
+)
+for _warning in rg_warnings:
+    print(f"WARNING [read groups] {_warning}", file=sys.stderr)
+
+unit_index = _build_unit_index(units)
+units_by_sample = _build_units_by_sample(units)
 
 valid_gender_values = {"f", "m"}
 invalid_gender = samples[~samples["gender"].isin(valid_gender_values) & samples["gender"].notna()]
@@ -32,40 +53,16 @@ if not invalid_gender.empty:
         f"Invalid gender values found. Must be 'f' or 'm':\n{invalid_samples}"
     )
 
-# Expand each sample's fq1/fq2 into an ordered per-lane list. The samplesheet
-# columns may be a glob (e.g. ..._L*_R1_001.fastq.gz) for multi-lane samples;
-# a plain path is just a glob that matches exactly one file, so single-lane and
-# externally-merged rows keep working unchanged. Lane tokens (L001, L002, ...)
-# are taken from the filename's _L\d\d\d_ field when present, else assigned by
-# sorted position; the true flowcell:lane for the read group is read from each
-# lane's FASTQ header at rule runtime (see common.get_lane_read_group).
-def _expand_lane_fastqs(fq1_glob, fq2_glob, ident):
-    fq1s = sorted(glob.glob(str(fq1_glob)))
-    fq2s = sorted(glob.glob(str(fq2_glob)))
-    if not fq1s:
-        raise FileNotFoundError(f"{ident}: fq1 pattern matched no files: {fq1_glob}")
-    if len(fq1s) != len(fq2s):
-        raise ValueError(
-            f"{ident}: R1/R2 lane count mismatch ({len(fq1s)} vs {len(fq2s)}) "
-            f"for patterns {fq1_glob} / {fq2_glob}"
-        )
-    tokens = []
-    for f in fq1s:
-        m = re.search(r"_L(\d{3})_", os.path.basename(f))
-        tokens.append(f"L{int(m.group(1)):03d}" if m else None)
-    if None in tokens or len(set(tokens)) != len(fq1s):
-        # filename lanes missing or non-unique -> fall back to positional tokens
-        tokens = [f"L{i:03d}" for i in range(1, len(fq1s) + 1)]
-    lanes = {tok: {"fq1": f1, "fq2": f2} for tok, f1, f2 in zip(tokens, fq1s, fq2s)}
-    return tokens, lanes
+# All four dicts below are built from the collapsed per-sample table, so a
+# multi-unit sample contributes exactly one entry. Building them from the raw
+# samplesheet would duplicate every multi-unit tumor through rule all and the
+# result-combining rules, and would resolve conflicting per-sample columns by
+# silently keeping whichever row happened to be last.
 
-# Create a dictionary of runs and their samples
 # {'ID': {'normal': 'CTRL', 'tumors': ['PT', 'PDX']}}
 # For tumor-only runs, normal will be None
 runs_dict = {}
 for run in samples["ID"].unique():
-    if pd.isna(run):
-        continue
     run_samples = samples[samples["ID"] == run]
     ctrl_samples = run_samples[run_samples["sample_type"] == "CTRL"]["sample"].tolist()
     tumor_samples = run_samples[run_samples["sample_type"] != "CTRL"]["sample"].tolist()
@@ -75,56 +72,28 @@ for run in samples["ID"].unique():
         "tumors": tumor_samples,
     }
 
-# Create a dictionary of PDX samples
 # {'ID': ['PDX']}
 pdx_dict = {}
 for run in samples["ID"].unique():
-    if pd.isna(run):
-        continue
     run_samples = samples[samples["ID"] == run]
     pdx_samples = run_samples[run_samples["sample_type"] == "PDX"]["sample"].tolist()
     if pdx_samples:
         pdx_dict[run] = pdx_samples
 
-# Create a dictionary to store per-lane fastq paths
-# {ID: {sample: {"lanes": ["L001", ...], "fq": {"L001": {"fq1":..,"fq2":..}}}}}
-fastq_dict = {}
-lane_dict = {}
-for _, row in samples.iterrows():
-    if pd.notna(row["ID"]):
-        ident = f"{row['ID']}/{row['sample']}"
-        tokens, lanes = _expand_lane_fastqs(row["fq1"], row["fq2"], ident)
-        fastq_dict.setdefault(row["ID"], {})[row["sample"]] = {
-            "lanes": tokens,
-            "fq": lanes,
-        }
-        lane_dict.setdefault(row["ID"], {})[row["sample"]] = tokens
-
-# Create probe configuration dictionary
 probe_dict = {}
 for _, row in samples.iterrows():
-    if pd.notna(row["ID"]) and pd.notna(row["capture_kit"]):
-        if row["ID"] not in probe_dict:
-            probe_dict[row["ID"]] = {}
-        probe_dict[row["ID"]][row["sample"]] = row["capture_kit"]
+    if pd.notna(row["capture_kit"]):
+        probe_dict.setdefault(row["ID"], {})[row["sample"]] = row["capture_kit"]
 
 # tumor_fraction: orthogonal/measured tumor cell fraction (sorting, cytometry,
 # PDX=1), used as ground truth for cnvkit purity when present. Blank/NA means
 # unknown -> resolve_purity_source falls back to PureCN (see purecn.smk). Stored
-# as float or None.
+# as float or None; build_units has already validated the range.
 tumor_fraction_dict = {}
 for _, row in samples.iterrows():
-    if pd.notna(row["ID"]):
-        if row["ID"] not in tumor_fraction_dict:
-            tumor_fraction_dict[row["ID"]] = {}
-        val = row["tumor_fraction"]
-        tf = None if pd.isna(val) or str(val).strip() in ("", "NA") else float(val)
-        if tf is not None and not (0 < tf <= 1):
-            raise ValueError(
-                f"{row['sample']}: tumor_fraction must be in (0,1] or NA/blank "
-                f"(got {val!r}); 0 is not a valid tumor fraction"
-            )
-        tumor_fraction_dict[row["ID"]][row["sample"]] = tf
+    val = row["tumor_fraction"]
+    tf = None if pd.isna(val) or str(val).strip() in ("", "NA") else float(val)
+    tumor_fraction_dict.setdefault(row["ID"], {})[row["sample"]] = tf
 
 # Validate tumor-only runs have PON configured
 for run, data in runs_dict.items():
@@ -138,18 +107,20 @@ for run, data in runs_dict.items():
 wildcard_constraints:
     run="[^/._]+",  # Match anything except slashes, dots and underscores
     sample="[^/.]+",  # Match anything except slashes and dots
-    lane="L[0-9]+",  # Lane token (L001, L002, ...); '.' separates it from sample
+    # Unit token: a real lane (L001) where one is known, else positional (u1).
+    # '.' separates it from the sample in {sample}.{unit} paths.
+    unit="L[0-9]{3}|u[0-9]+",
 
 
 # Import helper functions
 from workflow.scripts.common import *
 
 # Make dictionaries available to the common module
-import sys
 import workflow.scripts.common as common
 
-common.fastq_dict = fastq_dict
-common.lane_dict = lane_dict
+common.units = units
+common.unit_index = unit_index
+common.units_by_sample = units_by_sample
 common.runs_dict = runs_dict
 common.pdx_dict = pdx_dict
 common.probe_dict = probe_dict
@@ -159,6 +130,7 @@ common.samples = samples
 
 
 # Rules
+include: "workflow/rules/metadata.smk"
 include: "workflow/rules/ref_index.smk"
 include: "workflow/rules/host_read_filter.smk"
 include: "workflow/rules/bam_mapping_gatk.smk"
