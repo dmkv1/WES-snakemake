@@ -21,6 +21,18 @@ def get_unit_bams(wildcards):
     ]
 
 
+def get_unit_display_name(wildcards):
+    """The name this unit's QC rows carry in the MultiQC report.
+
+    Mirrors units.sample_renames, which does the same collapse for rows MultiQC
+    names after a filename. This one is for rows named from log content, which
+    that renaming never reaches.
+    """
+    if len(get_units(wildcards.run, wildcards.sample)) == 1:
+        return wildcards.sample
+    return f"{wildcards.sample}.{wildcards.unit}"
+
+
 def get_read_group(wildcards):
     """The unit's finished bwa '-R' argument.
 

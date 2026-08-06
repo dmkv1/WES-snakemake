@@ -12,7 +12,10 @@ os.environ["SINGULARITY_BIND"] = bind_paths
 
 sys.path.insert(0, os.path.dirname(workflow.snakefile))
 from workflow.scripts.units import (
+    row_types_mqc_table,
+    sample_renames,
     build_units,
+    units_mqc_table,
     unit_index as _build_unit_index,
     units_by_sample as _build_units_by_sample,
 )

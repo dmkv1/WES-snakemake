@@ -39,6 +39,7 @@ rule run_xengsort:
         outprefix="work/fastq/{run}/{sample}/{sample}.{unit}.xengsort",
         chunksize=config["params"]["xengsort"]["chunksize"],
         prefetch=config["params"]["xengsort"]["prefetch"],
+        display_name=get_unit_display_name,
     conda:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
@@ -53,10 +54,11 @@ rule run_xengsort:
             --chunksize {params.chunksize} \
             --prefetchlevel {params.prefetch} &> {log}
         # MultiQC's xengsort module names the report row after the --out path printed in
-        # this log, not the log filename; rewrite it to sample.unit so the row merges
-        # with that unit's fastp/fastqc data instead of appearing on its own (and so the
-        # units of a multi-lane PDX sample don't collide on one name).
+        # this log, not the log filename, so the name is rewritten here. It carries the
+        # unit only when the sample has more than one, matching how every other QC row
+        # is named. Because that name comes from the log content and not a filename,
+        # MultiQC sample renaming never sees it.
         # Braces are avoided in this comment on purpose: Snakemake formats the whole
         # shell block, comments included, and a bare placeholder is a NameError.
-        sed -i "s#{params.outprefix}#{wildcards.sample}.{wildcards.unit}#g" {log}
+        sed -i "s#{params.outprefix}#{params.display_name}#g" {log}
         """

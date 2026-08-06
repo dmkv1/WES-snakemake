@@ -385,6 +385,112 @@ def _warn_implicit_libraries(units: pd.DataFrame, sheet_rows: dict) -> list[str]
     return warnings
 
 
+# MultiQC parses the '# '-prefixed preamble of a custom-content file as YAML.
+# Apostrophes are avoided rather than escaped throughout: the text sits in a
+# single-quoted YAML scalar inside a Python string, and one stray quote ends the
+# scalar silently -- MultiQC then fails at the very end of a run.
+MQC_DESCRIPTION = "Read group of each FASTQ pair, and the source of its flowcell and lane."
+
+# The rg_source values name a pair of lookups: which source gave the flowcell,
+# and which gave the lane. Kept as a column tooltip so the section header stays
+# one line.
+MQC_RG_SOURCE_TOOLTIP = (
+    "sheet: the samplesheet. "
+    "header+lane: flowcell from the reads, lane from the file name. "
+    "header_nolane: flowcell from the reads, lane unknown, the file can span lanes. "
+    "filename: lane from the file name only. "
+    "positional: no source, units numbered in sequence."
+)
+
+MQC_COLUMNS = ["flowcell", "lane", "barcode", "library", "rg_source", "rg_id"]
+
+
+def units_mqc_table(units: pd.DataFrame) -> str:
+    """The units table as MultiQC custom content, header included."""
+    header = [
+        "# id: 'read_groups'",
+        "# section_name: 'Read groups'",
+        f"# description: '{MQC_DESCRIPTION}'",
+        "# plot_type: 'table'",
+        "# pconfig:",
+        "#     id: 'read_groups_table'",
+        "#     namespace: 'Read groups'",
+        "# headers:",
+        "#     rg_source:",
+        f"#         description: '{MQC_RG_SOURCE_TOOLTIP}'",
+    ]
+    rows = ["Sample\t" + "\t".join(MQC_COLUMNS)]
+    for row in units.to_dict("records"):
+        rows.append(f"{row['sample']}.{row['unit']}\t"
+                    + "\t".join(str(row[c]) for c in MQC_COLUMNS))
+    return "\n".join(header + rows) + "\n"
+
+
+def sample_renames(units: pd.DataFrame) -> dict[str, str]:
+    """MultiQC row renames: drop the unit token from single-unit samples.
+
+    The token stands in for a lane. A sample with one FASTQ pair has no lane to
+    distinguish, so `{sample}.u1` says nothing and only splits that sample into
+    two rows, one carrying its FASTQ metrics and one its BAM metrics.
+
+    Done per sample rather than by stripping `.u<N>` everywhere: a sample that
+    genuinely has several positional units needs them kept apart, or their rows
+    would overwrite each other and lose data silently.
+    """
+    renames = {}
+    for (_run, sample), group in units.groupby(["ID", "sample"], sort=False):
+        if len(group) == 1:
+            renames[f"{sample}.{group.iloc[0]['unit']}"] = sample
+    return renames
+
+
+ROW_TYPE_TOOLTIP = (
+    "sample: metrics from the finished BAM. unit: one FASTQ pair. "
+    "read: one FASTQ file. A sample with one FASTQ pair has its sample and unit "
+    "rows merged."
+)
+
+
+def row_types(units: pd.DataFrame) -> dict[str, str]:
+    """{MultiQC row name: sample|unit|read}.
+
+    The General Statistics table holds three kinds of row, each with its own
+    disjoint set of columns, because BAM metrics are per sample while FASTQ
+    metrics are per unit and per read. This labels which is which so the table
+    can be sorted into those groups.
+
+    Names are the ones MultiQC ends up using, so sample_renames is applied
+    first: a single-unit sample has no separate unit row to label.
+    """
+    renames = sample_renames(units)
+    rows: dict[str, str] = {}
+    for (_run, sample), group in units.groupby(["ID", "sample"], sort=False):
+        rows[sample] = "sample"
+        for unit in group["unit"]:
+            base = renames.get(f"{sample}.{unit}", f"{sample}.{unit}")
+            if base != sample:
+                rows[base] = "unit"
+            for read in ("R1", "R2"):
+                rows[f"{base}_{read}"] = "read"
+    return rows
+
+
+def row_types_mqc_table(units: pd.DataFrame) -> str:
+    """The row-type labels as MultiQC general-stats custom content."""
+    header = [
+        "# id: 'row_type'",
+        "# plot_type: 'generalstats'",
+        "# pconfig:",
+        "#     - row_type:",
+        "#         title: 'Row'",
+        f"#         description: '{ROW_TYPE_TOOLTIP}'",
+    ]
+    rows = ["Sample\trow_type"]
+    for name, kind in row_types(units).items():
+        rows.append(f"{name}\t{kind}")
+    return "\n".join(header + rows) + "\n"
+
+
 def units_by_sample(units: pd.DataFrame) -> dict[tuple[str, str], list[str]]:
     """{(run, sample): [unit token, ...]} in samplesheet order."""
     out: dict[tuple[str, str], list[str]] = {}

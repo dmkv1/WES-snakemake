@@ -1,17 +1,22 @@
-# Consolidate each sample's MultiQC rows (mirrors WES-PON-smk):
-#   - fastp/fastqc rows are per unit ({sample}.{unit}, where unit is L001 for a
-#     known lane or u1 positionally); "_fastp" is stripped so the fastp row keeps
-#     the {sample}.{unit} name instead of fastp's read guess.
-#   - MarkDuplicates gathers per-unit inputs named {sample}.{unit}.qgrp.bam and
-#     names its rows after them; the regex collapses that suffix so the
-#     dup-metrics row lands on {sample}. Verify empirically after a run: the
-#     Picard module derives the row name from the metrics file's INPUT field,
-#     which now lists one path per unit rather than a single BAM.
+# Consolidate each sample's MultiQC rows (mirrors WES-PON-smk). Three tiers,
+# deliberately:
+#   - fastqc rows are per unit and per read ({sample}.{unit}_R1)
+#   - fastp rows are per unit ({sample}.{unit}); "_fastp" is stripped so the row
+#     keeps that name instead of fastp's internal read-name guess
+#   - everything computed on the finished BAM (MarkDuplicates, HsMetrics,
+#     mosdepth, BaseRecalibrator) lands on the bare {sample}
+#
+# MarkDuplicates needs help to reach the third tier: its Picard module names the
+# row after the first INPUT it was given, which is now {sample}.{unit}.qgrp.bam,
+# so a four-lane sample's whole-sample duplication metric would be labelled
+# ".L001" and split off from that sample's other BAM metrics. Naming it from the
+# metrics filename instead gives dupl_metrics_{run}_{sample}, and the regex
+# strips the prefix. That regex is safe because the Snakefile rejects run IDs
+# containing '_', so the first field after the prefix is always the whole run ID.
 use_filename_as_sample_name:
   - fastp
+  - picard/markdups
 extra_fn_clean_exts:
   - "_fastp"
   - type: regex
-    pattern: "\\.(L\\d+|u\\d+)\\.qgrp$"
-  - ".qgrp"
-  - ".md"
+    pattern: "^dupl_metrics_[^_]+_"

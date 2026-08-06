@@ -35,6 +35,39 @@ rule write_sample_table:
         samples.to_csv(output.tsv, sep="\t", index=False)
 
 
+rule row_types_multiqc_table:
+    """Label each General Statistics row as sample, unit or read.
+
+    That table carries three kinds of row with disjoint columns, because BAM
+    metrics are per sample and FASTQ metrics are per unit and per read. The
+    label makes the table sortable into those groups.
+    """
+    input:
+        samplesheet=config["samplesheet"],
+    output:
+        tsv="results/qc/row_type_mqc.tsv",
+    run:
+        with open(output.tsv, "w") as fh:
+            fh.write(row_types_mqc_table(units))
+
+
+rule multiqc_renames:
+    """Collapse single-unit samples back onto one MultiQC row.
+
+    Generated per cohort rather than written into multiqc_config.yaml, because
+    which samples have one unit depends on the samplesheet.
+    """
+    input:
+        samplesheet=config["samplesheet"],
+    output:
+        yaml="results/qc/multiqc_renames.yaml",
+    run:
+        import yaml as _yaml
+
+        with open(output.yaml, "w") as fh:
+            _yaml.safe_dump({"sample_names_replace": sample_renames(units)}, fh)
+
+
 rule units_multiqc_table:
     """MultiQC custom-content view of the unit table."""
     input:
@@ -42,27 +75,8 @@ rule units_multiqc_table:
     output:
         tsv="results/qc/units_rg_mqc.tsv",
     run:
-        columns = [
-            "ID", "sample", "unit", "flowcell", "lane", "barcode", "library",
-            "rg_source", "rg_id",
-        ]
+        # Built by units.units_mqc_table so the YAML preamble is covered by the
+        # test suite: a malformed one only surfaces when MultiQC runs, which is
+        # the last rule of the workflow.
         with open(output.tsv, "w") as fh:
-            fh.write("# id: 'read_groups'\n")
-            fh.write("# section_name: 'Read groups'\n")
-            fh.write(
-                "# description: 'How each FASTQ pair's read group was resolved. "
-                "rg_source is the provenance: sheet (samplesheet asserted it), "
-                "header+lane (flowcell from the reads, lane from the filename), "
-                "header_nolane (flowcell known, lane unknown -- the file may span "
-                "lanes), filename (lane from the filename only), positional "
-                "(neither; units numbered in order).'\n"
-            )
-            fh.write("# plot_type: 'table'\n")
-            fh.write("# pconfig:\n")
-            fh.write("#     id: 'read_groups_table'\n")
-            fh.write("#     namespace: 'Read groups'\n")
-            fh.write("Sample\t" + "\t".join(columns[2:]) + "\n")
-            for row in units.to_dict("records"):
-                name = f"{row['sample']}.{row['unit']}"
-                fh.write(name + "\t" + "\t".join(
-                    str(row[c]) for c in columns[2:]) + "\n")
+            fh.write(units_mqc_table(units))

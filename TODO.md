@@ -12,7 +12,13 @@
 
 27. **WES-PON-smk preprocessing has diverged** — this pipeline now aligns per unit with real read groups, fixes mates with `samtools fixmate -m`, and marks duplicates on query-grouped input before sorting; `WES-PON-smk/workflow/rules/alignment.smk` still runs `bwa` → `AddOrReplaceReadGroups` → `FixMateInformation` → coordinate `MarkDuplicates`. Supplementary/secondary duplicate marking therefore differs, shifting coverage — which is what the CNVkit reference and the Mutect2 PON were built from. Second-order but not zero. Accepted deliberately when #15 landed (`config.yaml` comment amended); the fix is to port the same chain to WES-PON-smk and rebuild both PONs.
 
-28. **MultiQC row naming under the new suffixes needs empirical confirmation** — `multiqc_config.yaml` collapses `{sample}.{unit}.qgrp`, but the Picard module derives its dup-metrics row name from the metrics file's `INPUT` field, which now lists one path per unit instead of a single BAM, and the metrics file itself now carries one row per library. Verify against a real MultiQC run and adjust `extra_fn_clean_exts` from what it actually emits, not from inspection.
+---
+
+## Done (continued)
+
+28. ~~**MultiQC row naming under the new suffixes**~~ ✅ — confirmed empirically against a real 6-sample run and fixed. The Picard module names the dup-metrics row after the *first* `-I` it was given, so a four-lane sample's whole-sample duplication landed on `{sample}.L001` and split off from that sample's mosdepth/HsMetrics rows; stripping `.qgrp` did not help, because it is removed before the unit suffix can be matched. Fixed by naming that module from the metrics filename instead (`use_filename_as_sample_name: picard/markdups`) and stripping the `dupl_metrics_{run}_` prefix with a regex — safe because the Snakefile rejects run IDs containing `_`. Rows now sit in three deliberate tiers: fastqc per unit per read, fastp per unit, and everything computed on the finished BAM on the bare `{sample}`.
+
+29. ~~**MultiQC custom-content header was invalid YAML**~~ ✅ — the `description` in the read-groups table was a single-quoted YAML scalar containing an apostrophe (`pair's`), which ended the scalar and failed the whole MultiQC rule — the last rule of the workflow, hours into a run. MultiQC then crashed rendering its own error (`rich has no attribute 'panel'`), masking the cause. The table is now built by `units.units_mqc_table`, whose YAML preamble is asserted parseable in `tests/test_units.py`, so the failure class is caught in under a second instead of at the end of a run.
 
 ---
 

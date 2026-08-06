@@ -135,16 +135,15 @@ rule multiqc:
         # gets every pair, including cross-patient pairs that flag sample swaps.
         somalier_samples="results/qc/somalier/cohort/cohort.samples.tsv",
         somalier_pairs="results/qc/somalier/cohort/cohort.pairs.tsv",
-        # forces run_xengsort to complete before multiqc; also keeps its temp() graft fastqs
-        # around until multiqc runs instead of being deleted right after bwa_map consumes them
-        xengsort_graft=[
-            f"work/fastq/{run}/{sample}/{sample}.{unit}.xengsort-graft.1.fq.gz"
-            for run in runs_dict
-            for sample in pdx_dict.get(run, [])
-            for unit in get_units(run, sample)
-        ],
+        # run_xengsort is not listed here. MultiQC reads its work/logs/ log, not
+        # the graft FASTQs, and ordering is already guaranteed through
+        # dupl_metrics -> mark_duplicates -> bwa_map -> run_xengsort. Depending
+        # on the FASTQs made every MultiQC change regenerate deleted temp()
+        # files, which re-ran alignment and everything after it.
         units_mqc="results/qc/units_rg_mqc.tsv",
+        row_type_mqc="results/qc/row_type_mqc.tsv",
         config="multiqc_config.yaml",
+        renames="results/qc/multiqc_renames.yaml",
     output:
         "results/qc/multiqc_report.html",
     log:
@@ -152,4 +151,5 @@ rule multiqc:
     conda:
         "../envs/qc.yaml"
     shell:
-        "multiqc -c {input.config} results/ work/logs/ -o results/qc/ --force > {log} 2>&1"
+        "multiqc -c {input.config} -c {input.renames} results/ work/logs/ "
+        "-o results/qc/ --force > {log} 2>&1"

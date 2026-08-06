@@ -6,6 +6,11 @@ import pandas as pd
 import pytest
 
 from workflow.scripts.units import (
+    row_types,
+    row_types_mqc_table,
+    ROW_TYPE_TOOLTIP,
+    sample_renames,
+    units_mqc_table,
     SamplesheetError,
     build_rg_string,
     build_units,
@@ -306,6 +311,112 @@ def test_missing_required_column(fx, tmp_path):
 
 
 # --- lookups ---------------------------------------------------------------
+
+def test_single_unit_sample_drops_its_unit_token(fx, tmp_path):
+    """A lone positional token says nothing and splits the sample in two rows."""
+    fq1, fq2 = fx.pair(tmp_path, "S1", lane=1, lane_in_name=False)
+    units, _, _ = _resolve([fx.sheet_row("S1", fq1, fq2)])
+    assert sample_renames(units) == {"S1.u1": "S1"}
+
+
+def test_multi_unit_sample_keeps_its_tokens(fx, tmp_path):
+    """Collapsing these would overwrite one unit's row with another."""
+    for lane in (1, 2):
+        fx.pair(tmp_path, "S1", lane=lane)
+    units, _, _ = _resolve([fx.sheet_row(
+        "S1", tmp_path / "S1_S1_L*_R1_001.fastq.gz",
+        tmp_path / "S1_S1_L*_R2_001.fastq.gz")])
+    assert sample_renames(units) == {}
+
+
+def test_renames_are_per_sample(fx, tmp_path):
+    """One sample collapsing must not collapse another that has real units."""
+    fq1, fq2 = fx.pair(tmp_path / "solo", "S1", lane=1, lane_in_name=False)
+    for lane in (1, 2):
+        fx.pair(tmp_path / "multi", "S2", lane=lane)
+    units, _, _ = _resolve([
+        fx.sheet_row("S1", fq1, fq2),
+        fx.sheet_row("S2", tmp_path / "multi/S2_S1_L*_R1_001.fastq.gz",
+                     tmp_path / "multi/S2_S1_L*_R2_001.fastq.gz"),
+    ])
+    assert sample_renames(units) == {"S1.u1": "S1"}
+
+
+def test_row_types_label_every_general_stats_row(fx, tmp_path):
+    """One sample with four units, one with a single pair."""
+    for lane in (1, 2, 3, 4):
+        fx.pair(tmp_path / "multi", "S1", lane=lane)
+    fq1, fq2 = fx.pair(tmp_path / "solo", "S2", lane=1, lane_in_name=False)
+    units, _, _ = _resolve([
+        fx.sheet_row("S1", tmp_path / "multi/S1_S1_L*_R1_001.fastq.gz",
+                     tmp_path / "multi/S1_S1_L*_R2_001.fastq.gz"),
+        fx.sheet_row("S2", fq1, fq2),
+    ])
+    rt = row_types(units)
+    assert rt["S1"] == "sample"
+    assert rt["S1.L001"] == "unit"
+    assert rt["S1.L001_R1"] == "read"
+    # The single-unit sample has no separate unit row: it merged onto the sample.
+    assert rt["S2"] == "sample"
+    assert "S2.u1" not in rt
+    assert rt["S2_R1"] == "read"
+    from collections import Counter
+    assert Counter(rt.values()) == {"read": 10, "unit": 4, "sample": 2}
+
+
+def test_row_type_header_is_valid_yaml(fx, tmp_path):
+    import yaml
+
+    fq1, fq2 = fx.pair(tmp_path, "S1", lane=1)
+    units, _, _ = _resolve([fx.sheet_row("S1", fq1, fq2)])
+    text = row_types_mqc_table(units)
+    header = "\n".join(l[2:] for l in text.splitlines() if l.startswith("# "))
+    parsed = yaml.safe_load(header)
+    assert parsed["plot_type"] == "generalstats"
+
+
+def test_mqc_text_has_no_apostrophe():
+    """Both sit in single-quoted YAML scalars; one apostrophe ends the scalar."""
+    from workflow.scripts.units import MQC_DESCRIPTION, MQC_RG_SOURCE_TOOLTIP
+
+    assert "'" not in MQC_DESCRIPTION
+    assert "'" not in MQC_RG_SOURCE_TOOLTIP
+    assert "'" not in ROW_TYPE_TOOLTIP
+
+
+def test_mqc_header_is_valid_yaml(fx, tmp_path):
+    """MultiQC parses the '# ' preamble as YAML.
+
+    A stray apostrophe ends the single-quoted scalar and MultiQC fails -- on the
+    last rule of the workflow, hours in. Cheap to pin here instead.
+    """
+    import yaml
+
+    fq1, fq2 = fx.pair(tmp_path, "S1", lane=1)
+    units, _, _ = _resolve([fx.sheet_row("S1", fq1, fq2)])
+    text = units_mqc_table(units)
+
+    header = "\n".join(
+        line[2:] for line in text.splitlines() if line.startswith("# ")
+    )
+    parsed = yaml.safe_load(header)
+    assert parsed["id"] == "read_groups"
+    assert parsed["plot_type"] == "table"
+    assert parsed["pconfig"]["id"] == "read_groups_table"
+    # The rg_source legend is a column tooltip, so the section header stays one line.
+    assert "positional" in parsed["headers"]["rg_source"]["description"]
+
+
+def test_mqc_table_rows_match_units(fx, tmp_path):
+    for lane in (1, 2):
+        fx.pair(tmp_path, "S1", lane=lane)
+    units, _, _ = _resolve([fx.sheet_row(
+        "S1", tmp_path / "S1_S1_L*_R1_001.fastq.gz",
+        tmp_path / "S1_S1_L*_R2_001.fastq.gz")])
+    body = [l for l in units_mqc_table(units).splitlines() if not l.startswith("#")]
+    assert body[0].startswith("Sample\t")
+    assert [r.split("\t")[0] for r in body[1:]] == ["S1.L001", "S1.L002"]
+
 
 def test_lookup_helpers(fx, tmp_path):
     for lane in (1, 2):
