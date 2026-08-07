@@ -1,20 +1,13 @@
 """Read run identity out of the FASTQ records themselves.
 
-The parser below the marker is a verbatim copy of `wesingest/header.py` in the
-lab's WES repository, which is its canonical home. It is duplicated rather than
-imported so this workflow stays clone-and-run for deployments that have no
-wesingest; `tests/test_vendored_parser.py` compares the two sources object by
-object, so a divergence fails a test instead of going unnoticed.
+A samplesheet may name nothing but `sample,fq1,fq2`, so flowcell, lane and
+barcode have to be recoverable from the reads alone. That is what this module
+does, and it is self-contained: no samplesheet, no sidecar, no ingest tool.
 
-Do not edit anything above the "pipeline-local" marker. Changes belong upstream
-and then get re-copied here.
-
-`read_first_header` is part of the vendored surface and is kept identical for
-that comparison. The pipeline itself reads through `sample_headers`, because it
-needs two things upstream does not provide: the index, which lives in the
-header's comment field and is not part of what upstream parses (see docs/TODO.md
-item 2 in the WES repo), and evidence from more than one record, since no single
-record is reliable enough to name a read group.
+The parser fails open. A header it cannot read, a truncated payload or a file
+that is not gzip at all degrades to a blank field rather than an exception --
+unresolvable provenance becomes a positional unit token, is reported through
+`rg_source`, and the pipeline still returns calls.
 """
 
 from __future__ import annotations
@@ -23,10 +16,6 @@ import gzip
 import re
 from collections import Counter
 from pathlib import Path
-
-# --------------------------------------------------------------------------
-# Vendored verbatim from /mnt/data/NGS/WES/scripts/wesingest/header.py
-# --------------------------------------------------------------------------
 
 # CASAVA 1.8+ header. Everything this repository has ever held is this shape; the
 # pre-1.8 form (@inst:lane:tile:x:y#index/read) carries no flowcell and would defeat
@@ -81,10 +70,6 @@ def read_first_header(path: Path) -> ReadHeader | None:
     except (OSError, EOFError):
         return None
 
-
-# --------------------------------------------------------------------------
-# Pipeline-local additions. Not part of the vendored surface.
-# --------------------------------------------------------------------------
 
 # The comment field of a CASAVA 1.8+ header: "<read>:<filtered>:<control>:<index>".
 INDEX_RE = re.compile(r"^@\S+\s+[12]:[YN]:\d+:(?P<index>\S+)")
