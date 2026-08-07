@@ -12,13 +12,14 @@ first:
 
     flowcell = sheet.flowcell or header.flowcell or None
     lane     = sheet.lane     or filename _L(\\d{3})_ or None
-    barcode  = sheet.barcode  or header index, if unambiguous
+    barcode  = sheet.barcode  or the consensus index over the first records
 
 The lane is never taken from a read header. An externally lane-merged FASTQ
 starts on one lane and ends on another -- a file in this cohort begins at
 flowcell lane 1 and ends at lane 4 -- so the first record's lane is a claim
-about the file that is simply false. The header's lane is still parsed, and
-disagreeing with the filename is the signal that a file is merged or misnamed.
+about the file that is simply false. The header's lane is still parsed: it flags
+a merged or misnamed file when it disagrees with the filename, and more than one
+lane across the sampled records proves the file spans lanes.
 
 Failure is open: unresolvable provenance degrades to a positional unit token and
 is reported through `rg_source`, rather than blocking a run. Operators who do
@@ -34,7 +35,13 @@ from typing import Any
 
 import pandas as pd
 
-from workflow.scripts.fastq_header import parse_header, parse_index, read_first_line
+from workflow.scripts.fastq_header import (
+    MIXED_INDEX_THRESHOLD,
+    parse_header,
+    sample_headers,
+    sample_index,
+    sample_lanes,
+)
 
 # Lane token in a BaseSpace filename, e.g. ..._S3_L002_R1_001.fastq.gz.
 FILENAME_LANE_RE = re.compile(r"_L(\d{3})_")
@@ -133,11 +140,16 @@ def resolve_rg(unit: dict, row: dict, sample: str, n: int, *,
     sheet_library = _text(row.get("library"))
 
     header = index = None
+    index_share = 0.0
+    sampled_lanes: set[str] = set()
     if resolve_headers:
-        line = read_first_line(unit["fq1"])
-        if line is not None:
-            header = parse_header(line)
-            index = parse_index(line)
+        lines = sample_headers(unit["fq1"])
+        # The flowcell comes from the first record that parses, not strictly the
+        # first record, so one malformed header does not blank the whole unit.
+        header = next(
+            (h for h in (parse_header(line) for line in lines) if h), None)
+        index, index_share = sample_index(lines)
+        sampled_lanes = sample_lanes(lines)
 
     header_flowcell = header.flowcell if header else None
     header_lane = header.lane if header else None
@@ -158,6 +170,16 @@ def resolve_rg(unit: dict, row: dict, sample: str, n: int, *,
         # Not an operator error: the file is lane-merged, or was renamed.
         _disagree(f"{os.path.basename(unit['fq1'])} is named {filename_lane} but "
                   f"its first read is {header_lane}; the file may span lanes")
+    if len(sampled_lanes) > 1:
+        _disagree(f"{os.path.basename(unit['fq1'])} carries lanes "
+                  f"{'/'.join(sorted(sampled_lanes))} in its first records; it "
+                  f"spans lanes and no single lane describes it")
+    if index and index_share < MIXED_INDEX_THRESHOLD:
+        # Not raised under strict: a majority barcode is still the best available
+        # answer, and the file is usable. Demultiplexing is what needs looking at.
+        warnings.append(
+            f"{ident}: {os.path.basename(unit['fq1'])} mixes barcodes; "
+            f"{index} is only {index_share:.0%} of the unambiguous records")
 
     flowcell = sheet_flowcell or header_flowcell
     lane = sheet_lane or filename_lane

@@ -10,6 +10,8 @@ are the ones observed in this cohort or expected from ported deployments:
 
     clean           CASAVA 1.8+, one lane, clean barcode
     dirty_barcode   CASAVA 1.8+, N in the index (2 of 3 sampled files have this)
+    dirty_head      N in the index of the leading records only, clean after
+    mixed_barcode   two barcodes in one file, i.e. not cleanly demultiplexed
     lane_drift      starts on one lane, ends on another -- an externally merged
                     file, where the first record's lane is a false claim
     non_casava      SRA-style, carries no flowcell or lane
@@ -29,6 +31,7 @@ FLOWCELL = "HHFT3AFXC"
 READ_LENGTH = 151
 CLEAN_INDEX = "AGTCGCGA+CTGGTCTA"
 DIRTY_INDEX = "AGTCGCGA+NTGGTCTA"
+OTHER_INDEX = "TTGACCTG+CTGGTCTA"
 
 SHEET_COLUMNS = [
     "ID", "sample", "sample_type", "gender", "capture_kit", "tumor_fraction",
@@ -51,19 +54,35 @@ def _record(rng: random.Random, *, lane: int, read: str, flowcell: str,
 def fastq_text(n: int = 4, *, lane: int = 1, read: str = "R1",
                flowcell: str = FLOWCELL, instrument: str = INSTRUMENT,
                run_number: int = RUN_NUMBER, index: str = CLEAN_INDEX,
-               length: int = READ_LENGTH, final_lane: int | None = None) -> str:
+               length: int = READ_LENGTH, final_lane: int | None = None,
+               head_index: str | None = None, head_records: int = 1,
+               minority_index: str | None = None,
+               minority_share: float = 0.0) -> str:
     """`n` records. `final_lane` puts the last record on a different lane.
 
     That last-record case is the externally-merged file: parsing only the first
     record reports `lane`, while the file actually spans `lane`..`final_lane`.
+
+    `head_index` overrides the index of the leading `head_records` records, which
+    builds the file whose first record carries a miscalled index while the rest
+    of the unit is clean. `minority_index` gives that share of the records a
+    second barcode, for the mixed-barcode case.
     """
     rng = random.Random(f"{instrument}{run_number}{flowcell}{lane}{read}")
+    head = head_records if head_index is not None else 0
+    minority = round(n * minority_share) if minority_index else 0
     out = []
     for i in range(n):
         rec_lane = final_lane if (final_lane and i == n - 1) else lane
+        if i < head:
+            rec_index = head_index
+        elif i < head + minority:
+            rec_index = minority_index
+        else:
+            rec_index = index
         out.append(_record(rng, lane=rec_lane, read=read, flowcell=flowcell,
                            instrument=instrument, run_number=run_number,
-                           index=index, length=length))
+                           index=rec_index, length=length))
     return "".join(out)
 
 

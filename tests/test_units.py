@@ -146,6 +146,7 @@ def test_malformed_lane_column_is_refused(fx, tmp_path):
 # --- barcode ---------------------------------------------------------------
 
 def test_ambiguous_barcode_is_dropped(fx, tmp_path):
+    """Every record ambiguous means no barcode, not a guessed one."""
     fq1, fq2 = fx.pair(tmp_path, "S1", lane=1, index=fx.DIRTY_INDEX)
     units, _, _ = _resolve([fx.sheet_row("S1", fq1, fq2)])
     row = units.iloc[0]
@@ -153,7 +154,53 @@ def test_ambiguous_barcode_is_dropped(fx, tmp_path):
     assert row["rg_pu"] == f"{fx.FLOWCELL}.L001"
 
 
+def test_barcode_survives_a_miscall_in_the_first_record(fx, tmp_path):
+    """The whole point of sampling: it must reach PU, not just the parser.
+
+    Lanes 3 and 4 of the cohort's real run lost their barcode this way, so their
+    PU read `<flowcell>.L003` while lanes 1 and 2 carried the index.
+    """
+    fq1, fq2 = fx.pair(tmp_path, "S1", lane=1, n=20, index=fx.CLEAN_INDEX,
+                       head_index=fx.DIRTY_INDEX)
+    units, _, warnings = _resolve([fx.sheet_row("S1", fq1, fq2)])
+    row = units.iloc[0]
+    assert row["barcode"] == fx.CLEAN_INDEX
+    assert row["rg_pu"] == f"{fx.FLOWCELL}.L001.{fx.CLEAN_INDEX}"
+    assert warnings == []
+
+
+def test_mixed_barcodes_warn_but_do_not_block(fx, tmp_path):
+    """A file that was not cleanly demultiplexed still resolves to a majority.
+
+    This stays a warning under strict: the majority barcode is the best answer
+    available and the unit is usable, so blocking the run would be the wrong
+    trade. What needs attention is the demultiplexing, not the pipeline.
+    """
+    fq1, fq2 = fx.pair(tmp_path, "S1", lane=1, n=20, index=fx.CLEAN_INDEX,
+                       minority_index=fx.OTHER_INDEX, minority_share=0.4)
+    units, _, warnings = _resolve([fx.sheet_row("S1", fq1, fq2)], strict=True)
+    assert units.iloc[0]["barcode"] == fx.CLEAN_INDEX
+    assert any("mixes barcodes" in w for w in warnings)
+
+
+def test_sheet_barcode_overrides_the_consensus(fx, tmp_path):
+    fq1, fq2 = fx.pair(tmp_path, "S1", lane=1, index=fx.CLEAN_INDEX)
+    units, _, _ = _resolve([fx.sheet_row("S1", fq1, fq2, barcode="ACGTACGT")])
+    assert units.iloc[0]["barcode"] == "ACGTACGT"
+
+
 # --- cross-checks ----------------------------------------------------------
+
+def test_lanes_within_the_sample_prove_a_span(fx, tmp_path):
+    """Two lanes in the sampled window: the filename lane is a lie."""
+    fq1 = tmp_path / "S1_S1_L001_R1_001.fastq.gz"
+    fq2 = tmp_path / "S1_S1_L001_R2_001.fastq.gz"
+    fx.write_fastq(fq1, fx.fastq_text(8, lane=1, final_lane=4, read="R1"))
+    fx.write_fastq(fq2, fx.fastq_text(8, lane=1, final_lane=4, read="R2"))
+    _, _, warnings = _resolve([fx.sheet_row("S1", fq1, fq2)])
+    assert any("spans lanes" in w for w in warnings)
+    with pytest.raises(SamplesheetError, match="spans lanes"):
+        _resolve([fx.sheet_row("S1", fq1, fq2)], strict=True)
 
 def test_header_lane_disagreeing_with_filename_warns(fx, tmp_path):
     """The signal that a file is lane-merged or was renamed."""

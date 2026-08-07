@@ -10,15 +10,18 @@ Do not edit anything above the "pipeline-local" marker. Changes belong upstream
 and then get re-copied here.
 
 `read_first_header` is part of the vendored surface and is kept identical for
-that comparison. The pipeline itself reads through `read_first_line`, because it
-also needs the index, which lives in the header's comment field and is not part
-of what upstream parses (see docs/TODO.md item 2 in the WES repo).
+that comparison. The pipeline itself reads through `sample_headers`, because it
+needs two things upstream does not provide: the index, which lives in the
+header's comment field and is not part of what upstream parses (see docs/TODO.md
+item 2 in the WES repo), and evidence from more than one record, since no single
+record is reliable enough to name a read group.
 """
 
 from __future__ import annotations
 
 import gzip
 import re
+from collections import Counter
 from pathlib import Path
 
 # --------------------------------------------------------------------------
@@ -86,11 +89,32 @@ def read_first_header(path: Path) -> ReadHeader | None:
 # The comment field of a CASAVA 1.8+ header: "<read>:<filtered>:<control>:<index>".
 INDEX_RE = re.compile(r"^@\S+\s+[12]:[YN]:\d+:(?P<index>\S+)")
 
-# A usable barcode is unambiguous bases, single or dual-indexed. Real first
-# records routinely carry a miscalled base -- two of three files sampled from
-# this cohort have an N in the index -- and one sequencing error must not be
-# baked into every read group in the run.
+# A usable barcode is unambiguous bases, single or dual-indexed. Index reads are
+# the lowest-quality cycles on the flowcell and a miscalled base is common -- two
+# of three files sampled from this cohort carry an N in the very first record --
+# so a record with an ambiguous index is skipped rather than trusted.
 VALID_INDEX_RE = re.compile(r"^[ACGT]+(\+[ACGT]+)?$")
+
+# Unambiguous indexes wanted before the barcode vote is called, and the hard cap
+# on records read to find them. One miscalled index base must not decide the read
+# group for a whole unit, so the barcode is a vote rather than whatever the first
+# record happened to say.
+#
+# The count that matters is votes, not records. A fixed window would be the wrong
+# shape: the head of a FASTQ is the worst part of the run, because those records
+# come from the first tile at the edge of the flowcell where index reads fail
+# most. In this cohort one file's first unambiguous index is record 110 and
+# another's is record 98, while both are over 90 percent clean further in. Any
+# window short enough to be cheap is short enough to land entirely inside that
+# bad head; reading until the evidence arrives costs nothing on a clean file and
+# reads on only for the files that need it.
+INDEX_MIN_VOTES = 200
+INDEX_MAX_RECORDS = 5000
+
+# A demultiplexed FASTQ holds one barcode, so the winning index takes essentially
+# every unambiguous record. A lower share means the file mixes barcodes, and the
+# consensus is then a majority rather than a fact about the file.
+MIXED_INDEX_THRESHOLD = 0.9
 
 
 def parse_index(line: str) -> str | None:
@@ -102,15 +126,70 @@ def parse_index(line: str) -> str | None:
     return index if VALID_INDEX_RE.match(index) else None
 
 
-def read_first_line(path: Path | str) -> str | None:
-    """The first line of a gzipped FASTQ. None if unreadable or not a record.
+def read_headers(path: Path | str, records: int,
+                 min_votes: int | None = None) -> list[str]:
+    """Header lines from the head of a gzipped FASTQ. Empty list if unreadable.
 
-    One gzip block per file, which is what makes reading every unit's header
-    cheap enough to do on every DAG build.
+    Reads at most `records` of them. When `min_votes` is given, reading also
+    stops early once that many records have carried an unambiguous index, which
+    is what keeps the cost proportional to how dirty the file actually is.
+
+    Stops at the first line that does not look like a header, which keeps a file
+    whose four-line phase has drifted from being read as if it had not. A gzip
+    error mid-stream keeps the records already collected, so a truncated file
+    degrades to less evidence rather than to none.
     """
+    lines: list[str] = []
+    votes = 0
     try:
         with gzip.open(path, "rt", errors="replace") as fh:
-            line = fh.readline()
+            for n, line in enumerate(fh):
+                if n % 4:
+                    continue
+                if not line.startswith("@"):
+                    break
+                lines.append(line)
+                if min_votes is not None and parse_index(line):
+                    votes += 1
+                    if votes >= min_votes:
+                        break
+                if len(lines) >= records:
+                    break
     except (OSError, EOFError):
-        return None
-    return line if line.startswith("@") else None
+        pass
+    return lines
+
+
+def sample_headers(path: Path | str) -> list[str]:
+    """Header lines carrying enough evidence to resolve a unit's read group."""
+    return read_headers(path, INDEX_MAX_RECORDS, min_votes=INDEX_MIN_VOTES)
+
+
+def sample_index(lines: list[str]) -> tuple[str | None, float]:
+    """Consensus barcode over header lines, and its share of the clean ones.
+
+    The share is measured against the records that yielded an unambiguous index,
+    not against every record read, so it reports barcode agreement and not index
+    read quality. It is 0.0 when nothing was usable.
+    """
+    indexes = [i for i in (parse_index(line) for line in lines) if i]
+    if not indexes:
+        return None, 0.0
+    winner, hits = Counter(indexes).most_common(1)[0]
+    return winner, hits / len(indexes)
+
+
+def sample_lanes(lines: list[str]) -> set[str]:
+    """Every distinct lane seen in the sampled headers.
+
+    More than one is proof that the file spans lanes. One is not proof that it
+    does not, because an externally merged file is a concatenation and its head
+    is entirely the first lane -- which is why a lane is never taken from a read.
+    """
+    return {h.lane for h in (parse_header(line) for line in lines) if h}
+
+
+def read_first_line(path: Path | str) -> str | None:
+    """The first line of a gzipped FASTQ. None if unreadable or not a record."""
+    lines = read_headers(path, 1)
+    return lines[0] if lines else None
