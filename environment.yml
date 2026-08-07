@@ -6,4 +6,7 @@ dependencies:
   - python>=3.11
   - snakemake>=8.29.3
   - pandas>=2.0
+  - pyyaml
   - conda
+  - pytest
+  - pytest-cov
