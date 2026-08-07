@@ -109,6 +109,21 @@ rule mark_duplicates:
         """
 
 
+# samtools sort -m is a per-thread buffer, so the real footprint is
+# sort_mem x threads. Without this the scheduler sees the 4000 MB default and
+# can start a full-size GATK job beside the sort, which overcommits the host.
+def _sort_mem_mb():
+    raw = str(config["resources"]["sort_mem"]).strip()
+    unit = raw[-1].upper()
+    if unit in ("K", "M", "G"):
+        value = float(raw[:-1])
+        mb = {"K": value / 1024, "M": value, "G": value * 1024}[unit]
+    else:
+        mb = float(raw) / (1024 * 1024)  # a bare number is bytes, as in samtools
+    # 15% above the buffers themselves, for the merge pass and the BGZF output.
+    return int(mb * config["resources"]["threads"] * 1.15)
+
+
 # The one coordinate sort. --write-index with the ##idx## form names the index
 # {sample}.md.bai rather than {sample}.md.bam.bai, which is the filename the
 # BQSR rules below already expect.
@@ -123,6 +138,8 @@ rule sort_bam:
     conda:
         "../envs/bwamem.yaml"
     threads: config["resources"]["threads"]
+    resources:
+        mem_mb=_sort_mem_mb(),
     log:
         "work/logs/sort_bam_{run}_{sample}.log",
     shell:
