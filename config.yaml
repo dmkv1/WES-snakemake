@@ -1,6 +1,10 @@
-samplesheet: "samplesheet_test_small.csv"
-telegram_bot_env: "~/.telegram_bot.env"  # Path to .telegram_bot.env file; leave empty to disable notifications
-run_id: "dev test"            # Human-readable label prepended to Telegram notifications
+# Every /path/to/... below is a placeholder. Repoint them at this host before the
+# first run. Each reference and PON path must sit under refs.path or
+# panel_of_normals.path, because the Snakefile builds the container bind mounts
+# from exactly those two roots.
+samplesheet: "samplesheet.csv"
+telegram_bot_env: ""  # Path to .telegram_bot.env file; leave empty to disable notifications
+run_id: ""            # Human-readable label prepended to Telegram notifications, e.g. "missing_models"
 
 # Container images (pinned), matching WES-PON-smk so PON normals and caller
 # tumors run the same GATK build.
@@ -24,54 +28,54 @@ containers:
 #   covered_bedfile        — the "Covered" BED (probe regions). Primary interval
 #                            set: BQSR --intervals, mosdepth, Mutect2 intervals.
 #                            Matches the WES-PON-smk covered_bedfile.
-#   target_regions_bedfile — the "Regions" BED. Reserved (HsMetrics TARGET); no
-#                            consumer in this pipeline yet.
+#   target_regions_bedfile — the "Regions" BED, used as the HsMetrics TARGET
+#                            interval list (covered_bedfile is the BAIT set).
 probe_configs:
   "V6+UTR":
-    covered_bedfile:        "/mnt/data/NGS/refs/SureSelectHumanAllExon/V6UTR/S07604624_Covered.bed"
-    target_regions_bedfile: "/mnt/data/NGS/refs/SureSelectHumanAllExon/V6UTR/S07604624_Regions.bed"
-    cnvkit_targets:     "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/targets.bed"
-    cnvkit_antitargets: "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/antitargets.bed"
+    covered_bedfile:        "/path/to/refs/SureSelectHumanAllExon/V6UTR/S07604624_Covered.bed"
+    target_regions_bedfile: "/path/to/refs/SureSelectHumanAllExon/V6UTR/S07604624_Regions.bed"
+    cnvkit_targets:     "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/targets.bed"
+    cnvkit_antitargets: "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/antitargets.bed"
   "V8+UTR":
-    covered_bedfile:        "/mnt/data/NGS/refs/SureSelectHumanAllExon/V8UTR/S33613271_Covered.bed"
-    target_regions_bedfile: "/mnt/data/NGS/refs/SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
-    cnvkit_targets:     "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/targets.bed"
-    cnvkit_antitargets: "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/antitargets.bed"
+    covered_bedfile:        "/path/to/refs/SureSelectHumanAllExon/V8UTR/S33613271_Covered.bed"
+    target_regions_bedfile: "/path/to/refs/SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
+    cnvkit_targets:     "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/targets.bed"
+    cnvkit_antitargets: "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/antitargets.bed"
 
 refs:
   # Absolute paths to reference directory:
-  path: "/mnt/data/NGS/refs"
+  path: "/path/to/refs"
   # Absolute paths to reference files:
   ## Genomes
-  genome_human: "/mnt/data/NGS/refs/broad/Homo_sapiens_assembly38.fasta"
-  genome_host: "/mnt/data/NGS/refs/mm39/mm39.fa"
+  genome_human: "/path/to/refs/broad/Homo_sapiens_assembly38.fasta"
+  genome_host: "/path/to/refs/mm39/mm39.fa"
   ## BQSR
   known_sites:
-    - "/mnt/data/NGS/refs/broad/Homo_sapiens_assembly38.dbsnp138.vcf"
-    - "/mnt/data/NGS/refs/broad/Homo_sapiens_assembly38.known_indels.vcf.gz"
-    - "/mnt/data/NGS/refs/broad/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
+    - "/path/to/refs/broad/Homo_sapiens_assembly38.dbsnp138.vcf"
+    - "/path/to/refs/broad/Homo_sapiens_assembly38.known_indels.vcf.gz"
+    - "/path/to/refs/broad/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
   ## Mutect2
-  germline_resource: "/mnt/data/NGS/refs/gatk-BP-somatic-hg38/af-only-gnomad.hg38.vcf.gz"
+  germline_resource: "/path/to/refs/gatk-BP-somatic-hg38/af-only-gnomad.hg38.vcf.gz"
   ## Contamination (GetPileupSummaries / CalculateContamination)
-  contamination_resource: "/mnt/data/NGS/refs/gatk-BP-somatic-hg38/small_exac_common_3.hg38.vcf.gz"
+  contamination_resource: "/path/to/refs/gatk-BP-somatic-hg38/small_exac_common_3.hg38.vcf.gz"
   ## VEP cache (INSTALL.pl --CACHEDIR is the parent dir; VEP resolves
   ## <dir_cache>/<species>/<cache_version>_<assembly> itself)
   vep_cache:
-    dir: "/mnt/data/NGS/refs/vep_cache/GRCh38"
+    dir: "/path/to/refs/vep_cache/GRCh38"
     species: "homo_sapiens"
     assembly: "GRCh38"
     cache_version: 116
   ## Predownloaded AnnotSV cache
   annotsv_annotations:
     genome_build: "GRCh38"
-    path: "/mnt/data/NGS/refs/annotsv/AnnotSV_annotations"
+    path: "/path/to/refs/annotsv/AnnotSV_annotations"
   purecn:
     genome: "hg38"
     # UCSC Simple Repeats (Tandem Repeats Finder) track, hg38. See README
     # "Reference files" section for sourcing.
-    snp_blacklist: "/mnt/data/NGS/refs/UCSC/hg38_simpleRepeats.bed"
+    snp_blacklist: "/path/to/refs/UCSC/hg38_simpleRepeats.bed"
   ## Somalier (sample-swap / sex QC)
-  somalier_sites: "/mnt/data/NGS/refs/somalier/sites.hg38.vcf.gz"
+  somalier_sites: "/path/to/refs/somalier/sites.hg38.vcf.gz"
 
 params:
     rg:
@@ -111,7 +115,7 @@ params:
       # DELLY is the confirmatory caller in the Manta consensus, so favour
       # precision. Leave exclude empty to omit -x. See README "Reference files"
       # for sourcing the hg38 exclude template.
-      exclude: "/mnt/data/NGS/refs/delly/human.hg38.excl.tsv"
+      exclude: "/path/to/refs/delly/human.hg38.excl.tsv"
       map_qual: 20        # -q  min. paired-end mapping quality (default 1)
       mad_cutoff: 15      # -s  insert-size MAD cutoff, deletions only (default 9)
       min_clique_size: 5  # -z  min. PE/SR clique size; raise for high-coverage (default 2)
@@ -134,42 +138,49 @@ params:
 
 # Built by WES-PON-smk from all current normals, per capture kit.
 panel_of_normals:
-  path: "/mnt/data/NGS/WES/PON/WES-PON-smk"
+  path: "/path/to/WES-PON-smk"
   cnvkit:
     cnvkit_ref_m:
-      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/reference_m.cnn"
-      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/reference_m.cnn"
+      "V6+UTR": "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/reference_m.cnn"
+      "V8+UTR": "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/reference_m.cnn"
     cnvkit_ref_f:
-      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/reference_f.cnn"
-      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/reference_f.cnn"
+      "V6+UTR": "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV6UTR/reference_f.cnn"
+      "V8+UTR": "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/reference_f.cnn"
   mutect2:
-    "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/mutect2/SureSelectV6UTR/pon.vcf.gz"
-    "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/mutect2/SureSelectV8UTR/pon.vcf.gz"
+    "V6+UTR": "/path/to/WES-PON-smk/results/PON/mutect2/SureSelectV6UTR/pon.vcf.gz"
+    "V8+UTR": "/path/to/WES-PON-smk/results/PON/mutect2/SureSelectV8UTR/pon.vcf.gz"
   purecn:
     normaldb_m:
-      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/normalDB_SureSelectV6UTR_m_hg38.rds"
-      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/normalDB_SureSelectV8UTR_m_hg38.rds"
+      "V6+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/normalDB_SureSelectV6UTR_m_hg38.rds"
+      "V8+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/normalDB_SureSelectV8UTR_m_hg38.rds"
     normaldb_f:
-      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/normalDB_SureSelectV6UTR_f_hg38.rds"
-      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/normalDB_SureSelectV8UTR_f_hg38.rds"
+      "V6+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/normalDB_SureSelectV6UTR_f_hg38.rds"
+      "V8+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/normalDB_SureSelectV8UTR_f_hg38.rds"
     mapping_bias_m:
-      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_m_hg38.rds"
-      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_m_hg38.rds"
+      "V6+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_m_hg38.rds"
+      "V8+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_m_hg38.rds"
     mapping_bias_f:
-      "V6+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_f_hg38.rds"
-      "V8+UTR": "/mnt/data/NGS/WES/PON/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_f_hg38.rds"
+      "V6+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_f_hg38.rds"
+      "V8+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_f_hg38.rds"
 
 tumor_only:
   af_threshold: 0.001  # Filter variants with population AF > this
 
+# Sized for a 16-thread, 64 GB host, which is the common 4 GB per thread server
+# ratio. Scale every value with the machine, together with cores and
+# resources.mem_mb in profiles/default/config.yaml. The budget:
+#
+#   64 GB total, of which the profile offers 56 GB to the scheduler.
+#   One GATK job holds 40 GB (32 GB heap + 25% non-heap), so GATK rules run one
+#   at a time and roughly 16 GB stays free for the small rules beside them.
 resources:
   threads: 16
-  java_max_gb: 128
-  java_min_gb: 32
-  mem_mb: 163840       # java_max_gb + 25% non-heap overhead, for scheduler mem_mb tracking
+  java_max_gb: 32
+  java_min_gb: 8       # start small; the JVM grows to java_max_gb on demand
+  mem_mb: 40960        # java_max_gb + 25% non-heap overhead, for scheduler mem_mb tracking
   # Per-thread sort buffer for `samtools sort`. Set explicitly because the
   # samtools default (768M) is per thread, so it scales with -@ into a spike
-  # far larger than intended.
-  sort_mem: "2G"
-  manta_max_gb: 128
-  manta_mem_mb: 163840 # manta_max_gb + 25% overhead, for scheduler mem_mb tracking
+  # far larger than intended. 1G x 16 threads = 16 GB for the sort itself.
+  sort_mem: "1G"
+  manta_max_gb: 32
+  manta_mem_mb: 40960  # manta_max_gb + 25% overhead, for scheduler mem_mb tracking

@@ -131,6 +131,9 @@ These changes alter the output for the same input data:
   that file is absent.
 * The conda environments pin their package versions.
 * GATK 4.6.1.0 to 4.6.2.0. CNVkit 0.9.11 to 0.9.14. MultiQC 1.31 to 1.33.
+* The shipped `config.yaml` holds placeholder paths, not the paths of one host.
+* The resource defaults assume a 16-thread host with 64 GB of RAM, in place of the
+  64-thread host they assumed before. Raise them for a larger machine.
 * The README was rewritten against the code.
 
 ### Removed

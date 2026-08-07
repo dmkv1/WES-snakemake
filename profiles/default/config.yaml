@@ -1,10 +1,14 @@
 rerun-incomplete: true
 use-conda: true
 use-singularity: true
-cores: 48
+
+# Host capacity, sized for a 16-thread, 64 GB machine. Raise both to match a
+# larger host, together with the resources block in config.yaml.
+cores: 16
 
 default-resources:
   mem_mb: 4000
 
+# 56 GB of the 64 GB total. The rest stays with the OS and the page cache.
 resources:
-  mem_mb: 450000
+  mem_mb: 57344
