@@ -240,4 +240,4 @@ rule mosdepth:
     log:
         "work/logs/mosdepth_{run}_{sample}.log",
     shell:
-        "mosdepth --by {input.regions_bed} --thresholds 10,20,30,50 {params.prefix} {input.bam} > {log} 2>&1"
+        "mosdepth --no-per-base --by {input.regions_bed} --thresholds 10,20,30,50 {params.prefix} {input.bam} > {log} 2>&1"
