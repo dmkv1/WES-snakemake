@@ -58,8 +58,9 @@ wget -O /path/to/refs/delly/human.hg38.excl.tsv \
   https://raw.githubusercontent.com/dellytools/delly/main/excludeTemplates/human.hg38.excl.tsv
 ```
 
-The template uses `chr`-prefixed contig names, which agree with
-`Homo_sapiens_assembly38.fasta`. An empty value removes the `-x` option from DELLY.
+The template carries both `chr`-prefixed and unprefixed contig names, so it works with
+`Homo_sapiens_assembly38.fasta`. DELLY ignores the names that the BAM header does not
+contain. An empty value removes the `-x` option from DELLY.
 
 **PureCN SNP blacklist.** PureCN excludes repeat-region variants from the purity and
 ploidy fit. Build the BED from the UCSC Tandem Repeats Finder track:
@@ -71,7 +72,7 @@ zcat simpleRepeat.txt.gz | cut -f2-4 > hg38_simpleRepeats.bed   # chrom, chromSt
 
 ### Panel of Normals
 
-The sibling pipeline `WES-PON-smk` builds four sets of panel files. Each set has one
+The sibling pipeline [`WES-PON-smk`](https://github.com/dmkv1/WES-PON-smk) builds four sets of panel files. Each set has one
 entry per capture kit. Two sets also have one entry per sex.
 
 | Artifact | Config key | Used for |
