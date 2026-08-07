@@ -7,6 +7,30 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
+## [1.1.0] - 2026-08-07
+
+**This release does not change results.**
+
+Host configuration moves out of version control.
+
+### Changed
+
+* The repository tracks `config.yaml.example` and ignores `config.yaml`. A new checkout
+  needs one extra step before the first run:
+
+  ```bash
+  cp config.yaml.example config.yaml
+  ```
+
+  Then repoint the `/path/to/...` placeholders. An existing `config.yaml` is untouched.
+  It becomes an ignored file, so host paths no longer appear in a commit.
+
+### Note
+
+A checkout of `v1.0.0` or earlier overwrites the working `config.yaml`, because those
+commits track the file. Keep a copy of the host configuration outside the repository
+before you check out an older version.
+
 ## [1.0.0] - 2026-08-07
 
 The first tagged release. It adds a second SV caller, a purity model, sample identity QC,
@@ -165,5 +189,6 @@ Mutect2 SNV calling, CNVkit copy number calling, Manta SV calling, Funcotator
 annotation, xengsort host read filtering for PDX samples, and an Excel report per tumor
 sample.
 
+[1.1.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/dmkv1/WES-snakemake/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/dmkv1/WES-snakemake/releases/tag/v0.1.0
