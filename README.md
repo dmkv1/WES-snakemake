@@ -1,5 +1,6 @@
 # WES-snakemake: Somatic Variant Calling Pipeline
 
+[![version](https://img.shields.io/github/v/tag/dmkv1/WES-snakemake?label=version&sort=semver)](https://github.com/dmkv1/WES-snakemake/blob/development/CHANGELOG.md)
 [![tests](https://github.com/dmkv1/WES-snakemake/actions/workflows/tests.yml/badge.svg)](https://github.com/dmkv1/WES-snakemake/actions/workflows/tests.yml)
 ![coverage](.github/badges/coverage.svg)
 
@@ -481,6 +482,34 @@ through the workbook and the cohort tables:
 * `work/sv_merge/{run}/{sample}/{sample}.SV.annotated.tsv`, the AnnotSV output.
 * `work/purecn/{run}/{sample}/`, the PureCN report, and
   `work/purity/{run}/{sample}/{sample}.purity.csv`, the resolved purity.
+
+## Versioning
+
+The pipeline uses [Semantic Versioning](https://semver.org). A git tag is the source of
+truth, and the `VERSION` file holds the same number. `CHANGELOG.md` records every
+release.
+
+The public contract is the samplesheet schema, the `config.yaml` keys and the output
+paths. A version part changes for these reasons:
+
+| Part | Reason |
+|---|---|
+| MAJOR | A samplesheet column, a `config.yaml` key or an output path changes. A reference file or a Panel of Normals artifact becomes necessary. An output is removed |
+| MINOR | A tool, a rule or an output is added, and an existing configuration still runs |
+| PATCH | A bug fix, a documentation change, or a pinned version bump that does not change results |
+
+A pipeline has one rule that a software library does not need. **Any release that changes
+results for the same input data must say so at the top of its changelog entry.** A tool
+that produces different numbers is a scientific event, even when no key and no path
+changes. Do not compare a cohort across such a release. Run the old data again.
+
+To make a release:
+
+1. Update `CHANGELOG.md` and `VERSION`.
+2. Commit, then tag: `git tag -a v1.0.0 -m "v1.0.0"`.
+3. Push both: `git push origin development --follow-tags`.
+
+The version badge reads the newest tag, so it updates by itself.
 
 ## Known limitations
 
