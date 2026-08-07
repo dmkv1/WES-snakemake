@@ -38,7 +38,13 @@ tmp/
 
 # dev
 TODO
+TODO.md
+portability-todo.md
 .claude/
+
+# Host configuration. Copy config.yaml.example to config.yaml and repoint the
+# paths. The example is tracked; the working copy is not.
+config.yaml
 
 # tests
 results*/

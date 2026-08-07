@@ -86,7 +86,15 @@ Mutect2 PON entry.
 
 ## Configuration
 
-`config.yaml` holds the run settings. Repoint paths to actual reference and PON locations.
+`config.yaml` holds the run settings. The repository tracks `config.yaml.example` and
+ignores `config.yaml`, so your host paths stay out of git. Copy the example first:
+
+```bash
+cp config.yaml.example config.yaml
+```
+
+Then repoint every `/path/to/...` placeholder at the reference and PON locations of this
+host.
 
 | Key group | Contents |
 |---|---|
@@ -148,8 +156,7 @@ The pipeline aligns a sample once per lane. Each alignment gets its own read gro
 
 * **One row with globbed paths**, for example
   `fq1: /path/SAMPLE_S3_L*_R1_001.fastq.gz`. The glob expands to one *unit* per matched
-  pair. This is what the lab ingest emits. A plain path is a glob that matches one file,
-  so a single-file row is the one-unit case.
+  pair. A plain path is a glob that matches one file, so a single-file row is the one-unit case.
 * **One row per FASTQ pair**. Repeat the sample across rows with the same `ID` and
   `sample`. The per-sample columns must agree on every row of a sample. If they
   disagree, the run stops and the message names the conflict.
@@ -519,14 +526,6 @@ defaults to 0.001. Some recurrent somatic mutations exceed that frequency in gno
 example DNMT3A variants and JAK2 V617F. The filter therefore removes a small number of
 true somatic drivers. Read the tumor-only SNV results with this in mind. A paired run
 does not use this filter.
-
-**The preprocessing differs from the panel baseline.** `WES-PON-smk` built the panels of
-normals with an older preprocessing chain. That chain used AddOrReplaceReadGroups,
-FixMateInformation and coordinate-sorted duplicate marking. This pipeline uses per-unit
-read groups, `samtools fixmate` and query-grouped duplicate marking. The two chains mark
-supplementary reads differently, so the coverage is not identical to the panel baseline.
-The lab accepts this difference. `TODO.md` item 27 tracks the correction, which needs a
-rebuild of both panels.
 
 ## Acknowledgments
 
