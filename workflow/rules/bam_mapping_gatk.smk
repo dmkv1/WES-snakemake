@@ -97,6 +97,7 @@ rule mark_duplicates:
         config["containers"]["gatk"]
     shell:
         """
+        mkdir -p {params.tmp_dir}
         gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         MarkDuplicates \
@@ -104,7 +105,7 @@ rule mark_duplicates:
         -O {output.bam} \
         -M {output.metrics} \
         --ASSUME_SORT_ORDER queryname \
-        --TMP_DIR tmp \
+        --TMP_DIR {params.tmp_dir} \
         > {log} 2>&1
         """
 
@@ -135,6 +136,7 @@ rule sort_bam:
         bai=temp("results/{run}/{sample}/bam/{sample}.md.bai"),
     params:
         sort_mem=config["resources"]["sort_mem"],
+        tmp_dir="tmp",
     conda:
         "../envs/bwamem.yaml"
     threads: config["resources"]["threads"]
@@ -143,9 +145,12 @@ rule sort_bam:
     log:
         "work/logs/sort_bam_{run}_{sample}.log",
     shell:
-        "samtools sort -@ {threads} -m {params.sort_mem} --write-index "
-        "-T tmp/{wildcards.run}_{wildcards.sample}.sort "
-        "-o {output.bam}##idx##{output.bai} {input} 2> {log}"
+        """
+        mkdir -p {params.tmp_dir}
+        samtools sort -@ {threads} -m {params.sort_mem} --write-index \
+            -T {params.tmp_dir}/{wildcards.run}_{wildcards.sample}.sort \
+            -o {output.bam}##idx##{output.bai} {input} 2> {log}
+        """
 
 
 rule create_base_recalibration:
@@ -175,6 +180,7 @@ rule create_base_recalibration:
         config["containers"]["gatk"]
     shell:
         """
+        mkdir -p {params.tmp_dir}
         gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         BaseRecalibrator \
@@ -210,6 +216,7 @@ rule apply_base_recalibration:
         config["containers"]["gatk"]
     shell:
         """
+        mkdir -p {params.tmp_dir}
         gatk \
         --java-options "-Xms{resources.java_min_gb}G -Xmx{resources.java_max_gb}G" \
         ApplyBQSR \
