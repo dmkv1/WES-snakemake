@@ -4,6 +4,11 @@ def get_normal_sample(wildcards):
 
 
 rule run_mutect2:
+    """Call somatic variants. In paired mode the calling territory is the
+    intersection of the tumour's and the matched normal's capture kits: outside
+    it the normal has no coverage and cannot veto a call, and the PON is not
+    applied in paired mode, so germline sites would pass unopposed. A pair on
+    one kit passes the same BED twice, making the intersection a no-op."""
     input:
         tumor=lambda w: f"results/{w.run}/{w.sample}/bam/{w.sample}.bam",
         normal=lambda w: (
@@ -12,6 +17,10 @@ rule run_mutect2:
         ),
         refg=config["refs"]["genome_human"],
         regions=lambda w: f"work/refs/regions/{get_probe_version(w)}/regions.bed",
+        normal_regions=lambda w: (
+            f"work/refs/regions/{probe_dict[w.run][runs_dict[w.run]['normal']]}/regions.bed"
+            if not is_tumor_only(w) else []
+        ),
         pon=lambda w: get_pon_path(w) if is_tumor_only(w) else [],
     output:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.unfiltered.vcf",
@@ -25,6 +34,10 @@ rule run_mutect2:
             if not is_tumor_only(w) else ""
         ),
         pon_arg=lambda w: f"--panel-of-normals {get_pon_path(w)}" if is_tumor_only(w) else "",
+        normal_regions_arg=lambda w, input: (
+            f"--intervals {input.normal_regions} --interval-set-rule INTERSECTION"
+            if not is_tumor_only(w) else ""
+        ),
         germline=config["refs"]["germline_resource"],
         ref_path=config["refs"]["path"],
     threads: config["resources"]["threads"]
@@ -46,6 +59,7 @@ rule run_mutect2:
         --germline-resource {params.germline} \
         {params.pon_arg} \
         --intervals {input.regions} \
+        {params.normal_regions_arg} \
         {params.normal_args} \
         -I {input.tumor} \
         --f1r2-tar-gz {output.f1r2} \
