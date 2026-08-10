@@ -7,6 +7,51 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
+## [1.2.0] - 2026-08-10
+
+**This release changes results for tumour-normal pairs whose two samples use different
+capture kits.** Every other pair and every tumour-only sample is unaffected. If the
+cohort mixes kits within a pair, re-run Mutect2 before you compare against a 1.1.0
+cohort.
+
+### Changed
+
+* Mutect2 in paired mode now calls on the intersection of the tumour's and the matched
+  normal's capture kits, instead of the tumour's kit alone. Outside the intersection the
+  normal has no coverage and cannot veto a call, and the Panel of Normals is not applied
+  in paired mode, so germline sites passed unopposed. A pair on one kit passes the same
+  BED twice, which is a no-op.
+
+### Fixed
+
+* The rules that write to `tmp` now create it. `mark_duplicates`, `sort_bam`,
+  `create_base_recalibration`, `apply_base_recalibration`, `bed_to_interval_list` and
+  `collect_hs_metrics` failed on a fresh checkout, where the directory does not exist
+  yet. `mark_duplicates` also passed a hardcoded `tmp` to `--TMP_DIR` instead of its own
+  `tmp_dir` parameter.
+* `mosdepth` runs with `--no-per-base`. It was writing a per-base depth track that no
+  rule declares and no downstream step reads, which cost runtime and disk per sample.
+  The three declared outputs, the summary, the region distribution and the thresholds
+  BED, are unchanged.
+
+### Removed
+
+* `workflow/scripts/fastq_header.py` is no longer a vendored copy of `wesingest/header.py`
+  from the lab's WES repository. The parser is self-contained, so the workflow stays
+  clone-and-run without that repository present. `tests/test_vendored_parser.py`, which
+  compared the two sources object by object, is deleted along with the coupling. Parsing
+  behaviour does not change: the commit touches docstrings, comments and the removed
+  test only.
+
+### Documentation
+
+* The DELLY exclusion template carries both `chr`-prefixed and unprefixed contig names.
+  The README claimed it was `chr`-prefixed only.
+* The README links `WES-PON-smk` to its repository.
+* `units.py` and `fastq_header.py` describe the samplesheet shapes they accept without
+  reference to `wesingest`. A bare `sample,fq1,fq2` sheet and a fully specified one are
+  both first-class, as before.
+
 ## [1.1.0] - 2026-08-07
 
 **This release does not change results.**
