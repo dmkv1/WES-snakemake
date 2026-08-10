@@ -40,7 +40,7 @@ def test_plain_path_is_one_unit(fx, tmp_path):
 
 
 def test_glob_row_expands_to_all_lanes(fx, tmp_path):
-    """wesingest emits glob rows, so a row yields N units."""
+    """A glob row covering a sample's lanes yields N units."""
     for lane in (1, 2, 3, 4):
         fx.pair(tmp_path, "S1", lane=lane)
     units, samples, _ = _resolve([fx.sheet_row(

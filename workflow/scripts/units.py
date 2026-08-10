@@ -2,13 +2,12 @@
 
 A *unit* is one expanded (fq1, fq2) pair -- the thing that gets aligned once,
 with one read group. A samplesheet row yields one unit when it names a file pair
-directly, and N units when its fq1/fq2 are globs, which is what the lab's
-wesingest emits (`..._S{n}_L*_R1_001.fastq.gz`). Both shapes are first-class.
+directly, and N units when its fq1/fq2 are globs covering a sample's lanes
+(`..._S{n}_L*_R1_001.fastq.gz`). Both shapes are first-class.
 
 Read groups are *derived* by default and *overridden* by samplesheet columns, so
-the same code runs whether the sheet came from wesingest or is the bare
-`sample,fq1,fq2` a ported deployment would write. Resolution, most confident
-first:
+the same code runs for a fully specified sheet and for the bare
+`sample,fq1,fq2` minimum. Resolution, most confident first:
 
     flowcell = sheet.flowcell or header.flowcell or None
     lane     = sheet.lane     or filename _L(\\d{3})_ or None
