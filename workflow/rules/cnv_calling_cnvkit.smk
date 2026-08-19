@@ -48,6 +48,11 @@ rule cnvkit_coverage_and_fix:
     params:
         prefix="work/cnvkit/{run}/{sample}/{sample}",
     threads: config["resources"]["threads"]
+    resources:
+        # pysam BAM traversal, one worker process per -p thread.
+        mem_mb=8192,
+    benchmark:
+        "work/benchmarks/cnvkit_coverage_and_fix/{run}_{sample}.tsv",
     container:
         config["containers"]["cnvkit"]
     log:
@@ -96,9 +101,11 @@ rule gatk_haplotypecaller:
         ref_path=config["refs"]["path"],
     threads: config["resources"]["threads"]
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["medium"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["medium"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["medium"]["mem_mb"],
+    benchmark:
+        "work/benchmarks/gatk_haplotypecaller/{run}_{sample}.tsv",
     log:
         "work/logs/HaplotypeCaller_{run}_{sample}.log",
     container:
@@ -132,9 +139,11 @@ rule tumor_baf_allelic_counts:
     output:
         tsv="work/haplotypecaller/{run}/{sample}/{sample}.allelicCounts.tsv",
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["light"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["light"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["light"]["mem_mb"],
+    benchmark:
+        "work/benchmarks/tumor_baf_allelic_counts/{run}_{sample}.tsv",
     log:
         "work/logs/CollectAllelicCounts_{run}_{sample}.log",
     container:

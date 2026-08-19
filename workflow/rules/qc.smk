@@ -28,14 +28,16 @@ rule bed_to_interval_list:
         refg=config["refs"]["genome_human"],
     output:
         "work/intervals/{probes}.{kind}.interval_list",
+    benchmark:
+        "work/benchmarks/bed_to_interval_list/{probes}_{kind}.tsv",
     log:
         "work/logs/BedToIntervalList_{probes}_{kind}.log",
     container:
         config["containers"]["gatk"]
     resources:
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
-        java_max_gb=config["resources"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["light"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["light"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["light"]["java_max_gb"],
     wildcard_constraints:
         kind="bait|target",
     params:
@@ -79,14 +81,16 @@ rule collect_hs_metrics:
         targets=lambda wildcards: f"work/intervals/{probe_dict[wildcards.run][wildcards.sample]}.target.interval_list",
     output:
         metrics="results/metrics/{run}_{sample}.hs_metrics.txt",
+    benchmark:
+        "work/benchmarks/collect_hs_metrics/{run}_{sample}.tsv",
     log:
         "work/logs/CollectHsMetrics_{run}_{sample}.log",
     container:
         config["containers"]["gatk"]
     resources:
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
-        java_max_gb=config["resources"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["light"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["light"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["light"]["java_max_gb"],
     params:
         tmp_dir="tmp",
     shell:
@@ -148,6 +152,8 @@ rule multiqc:
         renames="results/qc/multiqc_renames.yaml",
     output:
         "results/qc/multiqc_report.html",
+    benchmark:
+        "work/benchmarks/multiqc/multiqc.tsv",
     log:
         "work/logs/multiqc.log",
     conda:

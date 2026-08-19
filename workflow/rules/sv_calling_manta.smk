@@ -12,8 +12,13 @@ rule cap_manta_bam_quality:
     output:
         bam=temp("work/manta/{run}/{sample}/{sample}.bqcap.bam"),
         bai=temp("work/manta/{run}/{sample}/{sample}.bqcap.bam.bai"),
+    benchmark:
+        "work/benchmarks/cap_manta_bam_quality/{run}_{sample}.tsv",
     conda:
         "../envs/pysam.yaml"
+    resources:
+        # Reads a full BAM and writes a full BAM; see apply_base_recalibration.
+        io_heavy=1,
     script:
         "../scripts/cap_base_quality.py"
 
@@ -53,6 +58,8 @@ rule run_manta:
     resources:
         mem_gb=config["resources"]["manta_max_gb"],
         mem_mb=config["resources"]["manta_mem_mb"],
+    benchmark:
+        "work/benchmarks/run_manta/{run}_{sample}.tsv",
     conda:
         "../envs/manta.yaml"
     log:

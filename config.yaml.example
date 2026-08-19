@@ -166,22 +166,49 @@ panel_of_normals:
 tumor_only:
   af_threshold: 0.001  # Filter variants with population AF > this
 
-# Sized for a 16-thread, 64 GB host, which is the common 4 GB per thread server
-# ratio. Scale every value with the machine, together with cores and
-# resources.mem_mb in profiles/default/config.yaml. The budget:
-#
-#   64 GB total, of which the profile offers 56 GB to the scheduler.
-#   One GATK job holds 40 GB (32 GB heap + 25% non-heap), so GATK rules run one
-#   at a time and roughly 16 GB stays free for the small rules beside them.
+# Scale every value with the machine, together with cores, resources.mem_mb and
+# resources.io_heavy in profiles/default/config.yaml. The budget: a heavy GATK
+# job holds 40 GB (32 GB heap + 25% non-heap), a medium one 20 GB and a light
+# one 10 GB, so the per-sample stages pack many-wide against the profile budget
+# rather than each reserving the cohort-scale figure.
 resources:
   threads: 16
-  java_max_gb: 32
-  java_min_gb: 8       # start small; the JVM grows to java_max_gb on demand
-  mem_mb: 40960        # java_max_gb + 25% non-heap overhead, for scheduler mem_mb tracking
+  # DELLY runs on 1-2 threads over exome BAMs, holding candidate junction reads
+  # and per-chromosome coverage. Outside the GATK tiers: it is a C++ binary, so
+  # a tier's JVM heap window and its derived mem_mb describe nothing about it.
+  delly_mem_mb: 8192
   # Per-thread sort buffer for `samtools sort`. Set explicitly because the
   # samtools default (768M) is per thread, so it scales with -@ into a spike
   # far larger than intended. 1G x 16 threads = 16 GB for the sort itself.
   sort_mem: "1G"
+
+  # GATK memory tiers. Each tier is a JVM heap window plus the mem_mb the
+  # scheduler reserves against the profile budget: the heap ceiling plus 25%
+  # non-heap overhead. java_min_gb starts small; the JVM grows to java_max_gb on
+  # demand. The figures are absolute and do not scale with threads. Rules pick a
+  # tier by real peak heap on a WES BAM, so that the per-sample stages, which use
+  # 2-4 GB, do not each reserve the largest figure and throttle the run to a
+  # handful of concurrent jobs.
+  gatk:
+    # BedToIntervalList, CollectHsMetrics, BaseRecalibrator, ApplyBQSR,
+    # GetPileupSummaries, CalculateContamination, FilterMutectCalls,
+    # CollectAllelicCounts.
+    light:
+      java_min_gb: 2
+      java_max_gb: 8
+      mem_mb: 10240
+    # MarkDuplicates, HaplotypeCaller, and LearnReadOrientationModel, which
+    # reads every f1r2 tar of a sample into memory at once.
+    medium:
+      java_min_gb: 4
+      java_max_gb: 16
+      mem_mb: 20480
+    # Mutect2, which holds the active-region assembly graphs for a paired
+    # tumor/normal WES pair across every worker thread.
+    heavy:
+      java_min_gb: 8
+      java_max_gb: 32
+      mem_mb: 40960
   manta_max_gb: 32
   manta_mem_mb: 40960  # manta_max_gb + 25% overhead, for scheduler mem_mb tracking
   # xengsort holds the whole human+mouse hash in the process, and nothing is

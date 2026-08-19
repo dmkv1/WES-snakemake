@@ -42,9 +42,11 @@ rule run_mutect2:
         ref_path=config["refs"]["path"],
     threads: config["resources"]["threads"]
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["heavy"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["heavy"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["heavy"]["mem_mb"],
+    benchmark:
+        "work/benchmarks/run_mutect2/{run}_{sample}.tsv",
     log:
         "work/logs/Mutect2_{run}_{sample}.log",
     container:
@@ -76,9 +78,11 @@ rule learn_read_orientation_model:
     params:
         ref_path=config["refs"]["path"],
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["medium"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["medium"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["medium"]["mem_mb"],
+    benchmark:
+        "work/benchmarks/learn_read_orientation_model/{run}_{sample}.tsv",
     log:
         "work/logs/LearnReadOrientationModel_{run}_{sample}.log",
     container:
@@ -107,9 +111,11 @@ rule get_pileup_summaries:
     params:
         ref_path=config["refs"]["path"],
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["light"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["light"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["light"]["mem_mb"],
+    benchmark:
+        "work/benchmarks/get_pileup_summaries/{run}_{sample}.tsv",
     log:
         "work/logs/GetPileupSummaries_{run}_{sample}.log",
     container:
@@ -151,9 +157,11 @@ rule calculate_contamination:
         ),
         ref_path=config["refs"]["path"],
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["light"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["light"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["light"]["mem_mb"],
+    benchmark:
+        "work/benchmarks/calculate_contamination/{run}_{sample}.tsv",
     log:
         "work/logs/CalculateContamination_{run}_{sample}.log",
     container:
@@ -187,9 +195,11 @@ rule filter_mutect2_calls:
     params:
         ref_path=config["refs"]["path"],
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["light"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["light"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["light"]["mem_mb"],
+    benchmark:
+        "work/benchmarks/filter_mutect2_calls/{run}_{sample}.tsv",
     log:
         "work/logs/FilterMutectCalls_{run}_{sample}.log",
     container:
@@ -272,6 +282,12 @@ rule vep:
         cache_version=config["refs"]["vep_cache"]["cache_version"],
         ref_path=config["refs"]["path"],
     threads: config["resources"]["threads"]
+    resources:
+        # --fork runs one process per thread, each holding its own copy of the
+        # cache slice it is reading plus its output buffers.
+        mem_mb=16384,
+    benchmark:
+        "work/benchmarks/vep/{run}_{sample}.tsv",
     log:
         "work/logs/VEP_{run}_{sample}.log",
     container:

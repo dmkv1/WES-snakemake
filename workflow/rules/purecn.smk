@@ -22,6 +22,8 @@ rule purecn_tumor_coverage:
         cnr="work/cnvkit/{run}/{sample}/{sample}.filtered.cnr",
     output:
         cov="work/purecn/{run}/{sample}/{sample}.purecn_cov.txt",
+    benchmark:
+        "work/benchmarks/purecn_tumor_coverage/{run}_{sample}.tsv",
     run:
         cov = pd.read_csv(input.cnr, sep="\t")
         cov["on_target"] = cov["gene"] != "Antitarget"
@@ -63,6 +65,12 @@ rule purecn_run:
         genome=config["refs"]["purecn"]["genome"],
         sex=get_sample_sex_purecn,
     threads: 4
+    resources:
+        # R holds the interval coverage and the segmentation for the sample in
+        # memory across the whole fit.
+        mem_mb=8192,
+    benchmark:
+        "work/benchmarks/purecn_run/{run}_{sample}.tsv",
     conda:
         "../envs/purecn.yaml"
     log:

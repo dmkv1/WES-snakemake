@@ -11,5 +11,18 @@ default-resources:
 
 # 240 GB, the share of the 504 GB host that matches the 32-of-64 core share.
 # The rest stays with the OS, the page cache and anything else on the machine.
+#
+# io_heavy caps the rules that read a whole BAM and write a whole BAM
+# (mark_duplicates, sort_bam, apply_base_recalibration, cap_manta_bam_quality),
+# which each declare io_heavy=1. Their memory tiers alone would let many run at
+# once; on the spinning-disk array that many concurrent whole-BAM rewrites turn
+# into seek thrash rather than throughput. Raise it on NVMe, lower it on a
+# single disk.
 resources:
   mem_mb: 245760
+  io_heavy: 4
+
+# Adds jobid, rule_name, wildcards, params, threads, cpu_usage, resources and
+# input_size_mb to every benchmark TSV, so a declared mem_mb and the max_rss it
+# was measured against sit in the same row.
+benchmark-extended: true
