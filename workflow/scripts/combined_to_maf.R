@@ -19,6 +19,10 @@ out_maf <- snakemake@output[["maf"]]
 
 # --- vcf2maf effect priority (lower = more severe) -------------------------
 # Used to collapse VEP's "&"-joined consequence list to a single SO term.
+# Transcribed from mskcc/vcf2maf >= 1.6.21 (%effect_priority in vcf2maf.pl);
+# re-ported 2026-08-19. Refresh both this table and so_to_maf() together when
+# VEP starts emitting SO terms that are absent here -- so_to_maf() warns on any
+# term it cannot map.
 effect_priority <- c(
   transcript_ablation = 1, exon_loss_variant = 1,
   splice_donor_variant = 2, splice_acceptor_variant = 2,
@@ -29,8 +33,9 @@ effect_priority <- c(
   missense_variant = 6, conservative_missense_variant = 6,
   rare_amino_acid_variant = 6,
   transcript_amplification = 7,
-  splice_region_variant = 8,
-  stop_retained_variant = 9, synonymous_variant = 9,
+  splice_region_variant = 8, splice_donor_5th_base_variant = 8,
+  splice_donor_region_variant = 8, splice_polypyrimidine_tract_variant = 8,
+  stop_retained_variant = 9, start_retained_variant = 9, synonymous_variant = 9,
   incomplete_terminal_codon_variant = 10,
   coding_sequence_variant = 11, mature_miRNA_variant = 11, exon_variant = 11,
   `5_prime_UTR_variant` = 12, `3_prime_UTR_variant` = 12,
@@ -79,9 +84,13 @@ so_to_maf <- function(effect, var_type, inframe) {
   if (effect %in% c("transcript_amplification", "intron_variant",
                     "intragenic_variant", "INTRAGENIC"))
     return("Intron")
-  if (effect == "splice_region_variant") return("Splice_Region")
+  if (effect %in% c("splice_region_variant", "splice_donor_5th_base_variant",
+                    "splice_donor_region_variant",
+                    "splice_polypyrimidine_tract_variant"))
+    return("Splice_Region")
   if (effect %in% c("incomplete_terminal_codon_variant", "synonymous_variant",
-                    "stop_retained_variant", "NMD_transcript_variant"))
+                    "stop_retained_variant", "start_retained_variant",
+                    "NMD_transcript_variant"))
     return("Silent")
   if (effect %in% c("mature_miRNA_variant", "exon_variant",
                     "non_coding_exon_variant", "non_coding_transcript_exon_variant",
@@ -94,12 +103,20 @@ so_to_maf <- function(effect, var_type, inframe) {
     return("IGR")
   if (effect == "upstream_gene_variant") return("5'Flank")
   if (effect == "downstream_gene_variant") return("3'Flank")
+  if (effect != "")
+    warning("[combined_to_maf] unmapped SO term '", effect,
+            "' -> Targeted_Region; refresh effect_priority from vcf2maf",
+            call. = FALSE)
   "Targeted_Region"
 }
 
 # --- VCF-style allele -> MAF allele + Start/End + Variant_Type --------------
 # Trims a shared suffix then a shared prefix (keeps left alignment), emits "-"
 # for the empty side of a simple indel, and recomputes coordinates.
+# This coordinate/allele transformation is intentional and deviates from the
+# VCF-style Position/Variant fields in combined_snvs.tsv, so MAF coordinates are
+# NOT a valid join key back to that table. Join on
+# Tumor_Sample_Barcode + vcf_position + vcf_variant instead.
 normalize_allele <- function(pos, ref, alt) {
   pos <- as.integer(pos)
   ref <- toupper(ref)
@@ -147,8 +164,12 @@ aa3to1 <- c(Ala = "A", Arg = "R", Asn = "N", Asp = "D", Cys = "C", Gln = "Q",
 shorten_hgvsp <- function(x) {
   if (is.na(x) || x == "") return("")
   x <- sub("^[^:]*:", "", x)  # drop ENSP..: transcript prefix if present
-  for (i in seq_along(aa3to1))
-    x <- gsub(names(aa3to1)[i], aa3to1[[i]], x, fixed = TRUE)
+  m <- gregexpr("[A-Z][a-z]{2}", x, perl = TRUE)
+  regmatches(x, m) <- lapply(regmatches(x, m), function(z) {
+    hit <- z %in% names(aa3to1)
+    z[hit] <- aa3to1[z[hit]]
+    z
+  })
   x
 }
 
@@ -157,7 +178,8 @@ maf_cols <- c(
   "Start_Position", "End_Position", "Strand", "Variant_Classification",
   "Variant_Type", "Reference_Allele", "Tumor_Seq_Allele1", "Tumor_Seq_Allele2",
   "Tumor_Sample_Barcode", "HGVSc", "HGVSp", "HGVSp_Short", "Transcript_ID",
-  "t_depth", "t_ref_count", "t_alt_count", "tumor_vaf"
+  "t_depth", "t_ref_count", "t_alt_count", "tumor_vaf",
+  "vcf_position", "vcf_variant"
 )
 
 snv <- suppressWarnings(read_tsv(in_tsv, show_col_types = FALSE,
@@ -189,9 +211,7 @@ var_type <- vapply(norm, `[[`, character(1), "type")
 vclass <- mapply(so_to_maf, effect, var_type, inframe, USE.NAMES = FALSE)
 
 symbol <- g("SYMBOL")
-gene   <- g("Gene")
-hugo <- ifelse(!is.na(symbol) & symbol != "", symbol,
-               ifelse(!is.na(gene) & gene != "", gene, "Unknown"))
+hugo <- ifelse(!is.na(symbol) & symbol != "", symbol, "Unknown")
 
 maf <- tibble(
   Hugo_Symbol           = hugo,
@@ -215,7 +235,9 @@ maf <- tibble(
   t_depth               = g("DP_tumor"),
   t_ref_count           = g("AD_REF_tumor"),
   t_alt_count           = g("AD_ALT_tumor"),
-  tumor_vaf             = g("AF_tumor")
+  tumor_vaf             = g("AF_tumor"),
+  vcf_position          = g("Position"),
+  vcf_variant           = g("Variant")
 )
 
 write_maf(maf)
