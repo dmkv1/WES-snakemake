@@ -1,12 +1,17 @@
 rule cap_manta_bam_quality:
     # Manta-only input: caps base qualities before calling, does not touch the
     # BAM used by any other rule. See TODO.md #22.
+    #
+    # temp(): run_manta is the only consumer, and a run's normal is held until
+    # the last tumour of that run has been called. Re-deriving one costs a
+    # single-threaded pysam pass over the full BAM (~30-40 min for 10 GB), so
+    # pass --notemp when a manta rerun over already-called samples is expected.
     input:
         bam="results/{run}/{sample}/bam/{sample}.bam",
         bai="results/{run}/{sample}/bam/{sample}.bai",
     output:
-        bam="work/manta/{run}/{sample}/{sample}.bqcap.bam",
-        bai="work/manta/{run}/{sample}/{sample}.bqcap.bam.bai",
+        bam=temp("work/manta/{run}/{sample}/{sample}.bqcap.bam"),
+        bai=temp("work/manta/{run}/{sample}/{sample}.bqcap.bam.bai"),
     conda:
         "../envs/pysam.yaml"
     script:
@@ -16,8 +21,15 @@ rule cap_manta_bam_quality:
 rule run_manta:
     input:
         tumor="work/manta/{run}/{sample}/{sample}.bqcap.bam",
+        # configManta.py resolves the indices itself, but they must be declared
+        # so temp() keeps them alive until this job runs.
+        tumor_bai="work/manta/{run}/{sample}/{sample}.bqcap.bam.bai",
         normal=lambda w: (
             f"work/manta/{w.run}/{runs_dict[w.run]['normal']}/{runs_dict[w.run]['normal']}.bqcap.bam"
+            if not is_tumor_only(w) else []
+        ),
+        normal_bai=lambda w: (
+            f"work/manta/{w.run}/{runs_dict[w.run]['normal']}/{runs_dict[w.run]['normal']}.bqcap.bam.bai"
             if not is_tumor_only(w) else []
         ),
         refg=config["refs"]["genome_human"],
@@ -37,8 +49,8 @@ rule run_manta:
         ),
         # Tumor-only outputs tumorSV.vcf.gz, paired outputs somaticSV.vcf.gz
         sv_output_name=lambda w: "tumorSV" if is_tumor_only(w) else "somaticSV",
+    threads: config["resources"]["threads"]
     resources:
-        threads=config["resources"]["threads"],
         mem_gb=config["resources"]["manta_max_gb"],
         mem_mb=config["resources"]["manta_mem_mb"],
     conda:
@@ -57,7 +69,7 @@ rule run_manta:
 
         {output.workflow} \
         --mode local \
-        --jobs {resources.threads} --memGb {resources.mem_gb} \
+        --jobs {threads} --memGb {resources.mem_gb} \
         >> {log} 2>&1
 
         # Fold paired-BND inversion records into proper INV records (TODO.md #22)

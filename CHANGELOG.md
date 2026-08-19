@@ -7,6 +7,39 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
+## [1.3.0] - 2026-08-19
+
+**This release does not change results.** The same input data gives the same calls as
+1.2.0. It changes what the scheduler believes each rule costs, so a run on a large host
+no longer over-subscribes CPU or memory.
+
+### Added
+
+* `resources.xengsort_mem_mb` and `resources.xengsort_index_mem_mb` in `config.yaml`.
+  Both are required. `run_xengsort` and `build_xengsort_index` declare them, so the
+  scheduler stops falling back to the profile's 4 GB default. xengsort holds the whole
+  human and mouse hash in the process and shares nothing between concurrent jobs, so the
+  footprint multiplies by the number of slots.
+
+### Changed
+
+* `run_manta` and `run_delly` declare their CPUs with `threads:` instead of a
+  `resources: threads=` entry. `resources.threads` is not Snakemake's CPU reservation,
+  so both rules were booked as one core while running many. `run_delly` now asks for one
+  thread per input BAM, two for a pair and one tumour-only, which is all its OpenMP loop
+  over the BAMs can use.
+* The quality-capped BAMs that Manta reads, `work/manta/{run}/{sample}/{sample}.bqcap.bam`,
+  are `temp()`. A run's normal is held until the last tumour of that run is called.
+  Re-deriving one costs a single-threaded pysam pass over the full BAM, around 30 to 40
+  minutes for 10 GB, so pass `--notemp` when a Manta rerun over already-called samples is
+  expected.
+
+### Fixed
+
+* `run_manta` declares the `.bai` of its tumour and normal inputs. `configManta.py`
+  resolves the indices itself, so they were undeclared, and `temp()` reaped them before
+  the calling job ran.
+
 ## [1.2.0] - 2026-08-10
 
 **This release changes results for tumour-normal pairs whose two samples use different
@@ -234,6 +267,8 @@ Mutect2 SNV calling, CNVkit copy number calling, Manta SV calling, Funcotator
 annotation, xengsort host read filtering for PDX samples, and an Excel report per tumor
 sample.
 
+[1.3.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/dmkv1/WES-snakemake/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/dmkv1/WES-snakemake/releases/tag/v0.1.0

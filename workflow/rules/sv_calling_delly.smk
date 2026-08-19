@@ -30,8 +30,10 @@ rule run_delly:
         map_qual=config["params"]["delly"]["map_qual"],
         mad_cutoff=config["params"]["delly"]["mad_cutoff"],
         min_clique_size=config["params"]["delly"]["min_clique_size"],
+    # DELLY's OpenMP parallelism is over the input BAMs, so it can use one thread
+    # per sample and no more: two for a paired run, one tumor-only.
+    threads: lambda wildcards: 1 if is_tumor_only(wildcards) else 2
     resources:
-        threads=config["resources"]["threads"],
         mem_mb=config["resources"]["mem_mb"],
     container:
         config["containers"]["delly"]
@@ -39,7 +41,7 @@ rule run_delly:
         "work/logs/Delly_{run}_{sample}.log",
     shell:
         """
-        export OMP_NUM_THREADS={resources.threads}
+        export OMP_NUM_THREADS={threads}
         delly sr \
         -g {input.refg} \
         {params.exclude_arg} \
