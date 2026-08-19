@@ -13,6 +13,8 @@ rule build_xengsort_index:
     conda:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
+    resources:
+        mem_mb=config["resources"]["xengsort_index_mem_mb"],
     log:
         "work/logs/xengsort-index.log",
     shell:
@@ -43,6 +45,8 @@ rule run_xengsort:
     conda:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
+    resources:
+        mem_mb=config["resources"]["xengsort_mem_mb"],
     log:
         "work/logs/xengsort_{run}_{sample}.{unit}.log",
     shell:

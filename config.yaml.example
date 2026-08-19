@@ -184,3 +184,9 @@ resources:
   sort_mem: "1G"
   manta_max_gb: 32
   manta_mem_mb: 40960  # manta_max_gb + 25% overhead, for scheduler mem_mb tracking
+  # xengsort holds the whole human+mouse hash in the process, and nothing is
+  # shared between concurrent classifications, so the footprint multiplies by
+  # the number of slots. Declared so the scheduler counts it instead of falling
+  # back to the profile default. The build peaks higher than a load, and runs once.
+  xengsort_mem_mb: 32768
+  xengsort_index_mem_mb: 65536
