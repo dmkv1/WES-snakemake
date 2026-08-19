@@ -42,8 +42,25 @@ if bad_ids:
 units, samples, rg_warnings = build_units(
     sheet, strict=config.get("params", {}).get("rg", {}).get("strict", True)
 )
-for _warning in rg_warnings:
-    print(f"WARNING [read groups] {_warning}", file=sys.stderr)
+# Print the read-group warnings once per snakemake invocation, not once per job.
+#
+# Rules with a run: directive spawn a worker process that re-imports this
+# Snakefile, so this module-level block executes again for every such job. This
+# workflow has ten of them (workflow/rules/metadata.smk,
+# cnv_calling_cnvkit.smk, somalier.smk, purecn.smk), which multiplies the
+# warning list out into an unreadable log.
+#
+# The guard is an environment variable rather than a module-level Python flag
+# because the spawned child gets a fresh namespace but inherits the
+# environment, so the flag survives the spawn while a fresh snakemake
+# invocation still warns.
+#
+# It is not an onstart handler because onstart does not fire on --dry-run, and
+# a dry run is exactly when these warnings need to be read.
+if not os.environ.get("WES_RG_WARNED"):
+    for _warning in rg_warnings:
+        print(f"WARNING [read groups] {_warning}", file=sys.stderr)
+    os.environ["WES_RG_WARNED"] = "1"
 
 unit_index = _build_unit_index(units)
 units_by_sample = _build_units_by_sample(units)
