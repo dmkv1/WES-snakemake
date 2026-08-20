@@ -1,4 +1,4 @@
-# Every /path/to/... below is a placeholder. Repoint them at this host before the
+# Every /path/to/... below is a placeholder. Repoint them before the
 # first run. Each reference and PON path must sit under refs.path or
 # panel_of_normals.path, because the Snakefile builds the container bind mounts
 # from exactly those two roots.
@@ -6,17 +6,7 @@ samplesheet: "samplesheet.csv"
 telegram_bot_env: ""  # Path to .telegram_bot.env file; leave empty to disable notifications
 run_id: ""            # Human-readable label prepended to Telegram notifications, e.g. "missing_models"
 
-# Container images (pinned), matching WES-PON-smk so PON normals and caller
-# tumors run the same GATK build.
-#
-# The preprocessing chains are no longer identical: this pipeline aligns per
-# unit with real read groups, fixes mates with samtools, and marks duplicates on
-# query-grouped input before sorting (GATK Best Practices ordering), while
-# WES-PON-smk still runs bwa -> AddOrReplaceReadGroups -> FixMateInformation ->
-# coordinate MarkDuplicates. Supplementary and secondary duplicate marking
-# therefore differs slightly, which shifts coverage, which is what the CNVkit
-# reference and the Mutect2 PON were built from. Accepted deliberately; porting
-# the chain to WES-PON-smk and rebuilding both PONs is tracked separately.
+# Container images
 containers:
   gatk: "docker://broadinstitute/gatk:4.6.2.0"
   vep: "docker://ensemblorg/ensembl-vep:release_116.0"
@@ -166,20 +156,21 @@ panel_of_normals:
 tumor_only:
   af_threshold: 0.001  # Filter variants with population AF > this
 
-# Scale every value with the machine, together with cores, resources.mem_mb and
-# resources.io_heavy in profiles/default/config.yaml. The budget: a heavy GATK
-# job holds 40 GB (32 GB heap + 25% non-heap), a medium one 20 GB and a light
-# one 10 GB, so the per-sample stages pack many-wide against the profile budget
-# rather than each reserving the cohort-scale figure.
+# Scale every value below with the machine. Also scale cores, resources.mem_mb
+# and resources.io_heavy in profiles/default/config.yaml.
+# Each GATK tier reserves its heap plus 25 percent for non-heap memory. A heavy
+# job holds 40 GB, and 32 GB of that is heap. The MarkDuplicates tier holds
+# 30 GB, a medium job holds 20 GB, and a light job holds 10 GB.
 resources:
   threads: 16
-  # DELLY runs on 1-2 threads over exome BAMs, holding candidate junction reads
-  # and per-chromosome coverage. Outside the GATK tiers: it is a C++ binary, so
-  # a tier's JVM heap window and its derived mem_mb describe nothing about it.
-  delly_mem_mb: 8192
-  # Per-thread sort buffer for `samtools sort`. Set explicitly because the
-  # samtools default (768M) is per thread, so it scales with -@ into a spike
-  # far larger than intended. 1G x 16 threads = 16 GB for the sort itself.
+  # Ceilings for the tools that stop scaling before `threads`. Snakemake lowers
+  # each one to the cores the host actually has, so these do not need editing
+  # for a smaller machine.
+  mutect2_threads: 8
+  haplotypecaller_threads: 16
+  manta_threads: 8
+  vep_threads: 4
+  delly_mem_mb: 4096
   sort_mem: "1G"
 
   # GATK memory tiers. Each tier is a JVM heap window plus the mem_mb the
@@ -197,23 +188,30 @@ resources:
       java_min_gb: 2
       java_max_gb: 8
       mem_mb: 10240
-    # MarkDuplicates, HaplotypeCaller, and LearnReadOrientationModel, which
-    # reads every f1r2 tar of a sample into memory at once.
+    # HaplotypeCaller and LearnReadOrientationModel, which reads every f1r2
+    # tar of a sample into memory at once.
     medium:
       java_min_gb: 4
       java_max_gb: 16
       mem_mb: 20480
+    # MarkDuplicates peaks near 15 GB on a 9 GB WES BAM, the peak tracks the duplicate-set
+    # index, which grows with library complexity, so it holds a heap window of its own.
+    markdup:
+      java_min_gb: 4
+      java_max_gb: 24
+      mem_mb: 30720
     # Mutect2, which holds the active-region assembly graphs for a paired
     # tumor/normal WES pair across every worker thread.
     heavy:
       java_min_gb: 8
       java_max_gb: 32
       mem_mb: 40960
-  manta_max_gb: 32
-  manta_mem_mb: 40960  # manta_max_gb + 25% overhead, for scheduler mem_mb tracking
-  # xengsort holds the whole human+mouse hash in the process, and nothing is
-  # shared between concurrent classifications, so the footprint multiplies by
-  # the number of slots. Declared so the scheduler counts it instead of falling
-  # back to the profile default. The build peaks higher than a load, and runs once.
+  # Manta parcels the call out to its own task scheduler under --jobs and holds
+  # under 1 GB in the parent process, so --memGb is a ceiling for that scheduler
+  # rather than a heap it fills. manta_max_gb stays at or under 0.8 of
+  # manta_mem_mb, the same ratio the GATK tiers hold.
+  manta_max_gb: 6
+  manta_mem_mb: 8192
+
   xengsort_mem_mb: 32768
-  xengsort_index_mem_mb: 65536
+  xengsort_index_mem_mb: 32768

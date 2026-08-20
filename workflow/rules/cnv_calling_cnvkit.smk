@@ -99,7 +99,7 @@ rule gatk_haplotypecaller:
         idx="work/haplotypecaller/{run}/{sample}/{sample}.germline.vcf.idx",
     params:
         ref_path=config["refs"]["path"],
-    threads: config["resources"]["threads"]
+    threads: config["resources"]["haplotypecaller_threads"]
     resources:
         java_max_gb=config["resources"]["gatk"]["medium"]["java_max_gb"],
         java_min_gb=config["resources"]["gatk"]["medium"]["java_min_gb"],

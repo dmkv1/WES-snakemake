@@ -67,8 +67,8 @@ rule purecn_run:
     threads: 4
     resources:
         # R holds the interval coverage and the segmentation for the sample in
-        # memory across the whole fit.
-        mem_mb=8192,
+        # memory across the whole fit, and peaks near 10 GB on a WES tumour.
+        mem_mb=16384,
     benchmark:
         "work/benchmarks/purecn_run/{run}_{sample}.tsv",
     conda:

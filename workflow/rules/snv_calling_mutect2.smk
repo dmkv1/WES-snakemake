@@ -40,7 +40,7 @@ rule run_mutect2:
         ),
         germline=config["refs"]["germline_resource"],
         ref_path=config["refs"]["path"],
-    threads: config["resources"]["threads"]
+    threads: config["resources"]["mutect2_threads"]
     resources:
         java_max_gb=config["resources"]["gatk"]["heavy"]["java_max_gb"],
         java_min_gb=config["resources"]["gatk"]["heavy"]["java_min_gb"],
@@ -281,11 +281,11 @@ rule vep:
         assembly=config["refs"]["vep_cache"]["assembly"],
         cache_version=config["refs"]["vep_cache"]["cache_version"],
         ref_path=config["refs"]["path"],
-    threads: config["resources"]["threads"]
+    threads: config["resources"]["vep_threads"]
     resources:
         # --fork runs one process per thread, each holding its own copy of the
         # cache slice it is reading plus its output buffers.
-        mem_mb=16384,
+        mem_mb=4096,
     benchmark:
         "work/benchmarks/vep/{run}_{sample}.tsv",
     log:

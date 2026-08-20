@@ -68,7 +68,9 @@ rule bwa_map:
     resources:
         # The hg38 BWA index is ~5.5 GB resident and shared across threads; the
         # rest is per-thread alignment buffers plus the piped samtools fixmate.
-        mem_mb=10240,
+        mem_mb=12288,
+        # Writes a full BAM per unit; see apply_base_recalibration.
+        io_heavy=1,
     log:
         "work/logs/bwamem_{run}_{sample}.{unit}.log",
     shell:
@@ -96,9 +98,9 @@ rule mark_duplicates:
         tmp_dir="tmp",
         inputs=lambda wildcards, input: " ".join(f"-I {b}" for b in input),
     resources:
-        java_max_gb=config["resources"]["gatk"]["medium"]["java_max_gb"],
-        java_min_gb=config["resources"]["gatk"]["medium"]["java_min_gb"],
-        mem_mb=config["resources"]["gatk"]["medium"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["markdup"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["markdup"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["markdup"]["mem_mb"],
         # Reads every unit BAM and writes a full BAM; see apply_base_recalibration.
         io_heavy=1,
     benchmark:
@@ -133,8 +135,10 @@ def _sort_mem_mb():
         mb = {"K": value / 1024, "M": value, "G": value * 1024}[unit]
     else:
         mb = float(raw) / (1024 * 1024)  # a bare number is bytes, as in samtools
-    # 15% above the buffers themselves, for the merge pass and the BGZF output.
-    return int(mb * config["resources"]["threads"] * 1.15)
+    # 30% above the buffers themselves. samtools spends the full per-thread
+    # buffer and then carries the merge pass and the BGZF output on top, which
+    # measures at roughly 11% over the buffers on a WES BAM; the rest is margin.
+    return int(mb * config["resources"]["threads"] * 1.3)
 
 
 # The one coordinate sort. --write-index with the ##idx## form names the index
