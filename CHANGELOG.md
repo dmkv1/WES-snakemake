@@ -7,6 +7,103 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
+## [2.0.0] - 2026-08-20
+
+**This release breaks existing setups.** The `resources` block of `config.yaml` is
+restructured: three keys are removed and the GATK rules read a tier instead, so a 1.3.0
+`config.yaml` raises a `KeyError` while Snakemake parses the rules, before any job runs.
+Read the Breaking changes section before you upgrade. No samplesheet column, no
+reference file and no output path changes.
+
+**This release changes `results/combined/cohort.maf`.** Calls do not change: the same
+input data gives the same VCFs, and every other `combined_*` table is byte-identical.
+The MAF gains three columns and re-classifies a handful of consequence terms, so re-run
+`cohort_maf` before you compare a MAF against a 1.3.0 cohort.
+
+### Breaking changes
+
+`config.yaml` keys:
+
+| Old | New |
+|---|---|
+| `resources.java_max_gb`, `resources.java_min_gb`, `resources.mem_mb` | `resources.gatk.<tier>.java_max_gb`, `.java_min_gb` and `.mem_mb`, for the tiers `light`, `medium`, `markdup` and `heavy` |
+
+New required `config.yaml` keys, which have no defaults: `resources.gatk.*`,
+`resources.mutect2_threads`, `resources.haplotypecaller_threads`,
+`resources.manta_threads`, `resources.vep_threads` and `resources.delly_mem_mb`.
+
+Copy the `resources` block from `config.yaml.example` into an existing `config.yaml`
+rather than patching key by key.
+
+### Added
+
+* `resources.gatk.light`, `.medium`, `.markdup` and `.heavy` in `config.yaml`. Each is a
+  `java_min_gb` / `java_max_gb` / `mem_mb` triple. Every GATK rule names a tier instead
+  of the one global heap, so `ApplyBQSR` no longer reserves what `Mutect2` reserves.
+  Ceilings are about 2.5x the `max_rss` the rule's benchmark recorded on a 9 GB WES BAM.
+* `resources.mutect2_threads`, `resources.haplotypecaller_threads`,
+  `resources.manta_threads`, `resources.vep_threads` and `resources.delly_mem_mb`. They
+  cap the tools that stop scaling before `resources.threads`; Snakemake lowers each to
+  the cores the host has, so they need no editing for a smaller machine.
+* A memory reservation on the five non-GATK rules that had none: `bwa_map` 12 GB,
+  `purecn_run` 16 GB, `cnvkit_coverage_and_fix` 8 GB, `vep` 4 GB and
+  `cap_manta_bam_quality` 1 GB. These are set in the rules, not in `config.yaml`, because
+  they do not scale with the host. The scheduler had been booking each at the profile's
+  4 GB `default-resources` figure.
+* An `io_heavy` resource, capped at 4 in `profiles/default/config.yaml`. `bwa_map`,
+  `mark_duplicates`, `sort_bam`, `apply_base_recalibration` and `cap_manta_bam_quality`
+  each declare 1. Their memory tiers alone would let many run at once, and on a
+  spinning-disk array that many concurrent whole-BAM rewrites seek-thrash rather than
+  deliver throughput. Raise it on NVMe.
+* `benchmark:` on 28 rules, writing `work/benchmarks/<rule>/<run>_<sample>.tsv`, one file
+  per unit for the rules that run per unit and a single file for `multiqc` and
+  `build_xengsort_index`. `benchmark-extended: true` in the profile puts the declared
+  resources and the `max_rss` they were measured against in the same row.
+* `cohort.maf` gains `Gene`, the Ensembl gene ID, and `vcf_position` / `vcf_variant`.
+  MAF coordinates are re-derived to MAF convention and are not a valid join key back to
+  `combined_snvs.tsv`; join on `Tumor_Sample_Barcode` plus the two `vcf_*` columns.
+
+### Changed
+
+* `resources.manta_max_gb` 32 to 6 and `resources.manta_mem_mb` 40960 to 8192. Manta
+  parcels the call out to its own scheduler under `--jobs` and holds under 1 GB in the
+  parent, so `--memGb` is a ceiling for that scheduler, not a heap it fills.
+* `resources.xengsort_index_mem_mb` 65536 to 32768. The index build measured 21.7 GB.
+* `run_delly` reserves `resources.delly_mem_mb`, 4 GB, instead of the global
+  `resources.mem_mb`, 40 GB. It measured 1.1 GB.
+* `sort_bam` reserves 30% over its per-thread buffers instead of 15%. The buffers
+  themselves, the merge pass and the BGZF output measured about 11% over on a WES BAM;
+  the rest is margin.
+* `profiles/default/config.yaml` moves to 32 cores and 245760 MB, half of a 64-thread,
+  504 GB host. Scale it with the `resources` block, as before.
+
+### Fixed
+
+* `combined_to_maf.R` maps ten SO terms it previously did not: `start_retained_variant`,
+  `splice_donor_5th_base_variant`, `splice_donor_region_variant`,
+  `splice_polypyrimidine_tract_variant`, `TFBS_ablation`, `TFBS_amplification`,
+  `regulatory_region_ablation`, `regulatory_region_amplification`,
+  `feature_elongation` and `feature_truncation`. A variant whose only consequence was
+  one of these was written as `Targeted_Region`; it now gets `Silent`, `Splice_Region`
+  or `IGR`. In a multi-term consequence list the term also ranked last instead of at its
+  vcf2maf priority. The SnpEff-only synonyms vcf2maf carries are still left out, and the
+  header comment now says so, so the next re-port does not read the gap as an oversight.
+* An SO term with no entry in either table is now collected and reported once per run.
+  It was warned about per variant, and R collapses anything past 50 warnings into "There
+  were 50 or more warnings", which loses the term names.
+* `HGVSp_Short` substitutes only whole three-letter codons. It replaced any occurrence of
+  a codon name anywhere in the string.
+* The read-group warnings print once per Snakemake invocation. Rules with a `run:`
+  directive re-import the Snakefile in a worker process, so the list was repeated ten
+  times in the main log.
+
+### Documentation
+
+* The README describes the profile the repository ships, not the 16-thread, 64 GB host
+  it was first sized for.
+* `config.yaml.example` states where each memory figure comes from and which benchmark
+  to re-read after a cohort at different coverage.
+
 ## [1.3.0] - 2026-08-19
 
 **This release does not change results.** The same input data gives the same calls as
@@ -267,6 +364,7 @@ Mutect2 SNV calling, CNVkit copy number calling, Manta SV calling, Funcotator
 annotation, xengsort host read filtering for PDX samples, and an Excel report per tumor
 sample.
 
+[2.0.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.0.0...v1.1.0
