@@ -19,6 +19,11 @@ out_maf <- snakemake@output[["maf"]]
 
 # --- vcf2maf effect priority (lower = more severe) -------------------------
 # Used to collapse VEP's "&"-joined consequence list to a single SO term.
+# Transcribed from mskcc/vcf2maf >= 1.6.21 (%effect_priority in vcf2maf.pl),
+# restricted to terms VEP emits: the SnpEff-only synonyms vcf2maf also carries
+# (conservative_inframe_*, 5_prime_UTR_premature_start_codon_gain_variant) are
+# deliberately absent. Refresh both this table and so_to_maf() together -- any
+# term missing from either is collected and warned about once per run.
 effect_priority <- c(
   transcript_ablation = 1, exon_loss_variant = 1,
   splice_donor_variant = 2, splice_acceptor_variant = 2,
@@ -29,8 +34,9 @@ effect_priority <- c(
   missense_variant = 6, conservative_missense_variant = 6,
   rare_amino_acid_variant = 6,
   transcript_amplification = 7,
-  splice_region_variant = 8,
-  stop_retained_variant = 9, synonymous_variant = 9,
+  splice_region_variant = 8, splice_donor_5th_base_variant = 8,
+  splice_donor_region_variant = 8, splice_polypyrimidine_tract_variant = 8,
+  stop_retained_variant = 9, start_retained_variant = 9, synonymous_variant = 9,
   incomplete_terminal_codon_variant = 10,
   coding_sequence_variant = 11, mature_miRNA_variant = 11, exon_variant = 11,
   `5_prime_UTR_variant` = 12, `3_prime_UTR_variant` = 12,
@@ -39,10 +45,42 @@ effect_priority <- c(
   intron_variant = 14, intragenic_variant = 14, INTRAGENIC = 14,
   NMD_transcript_variant = 15,
   upstream_gene_variant = 16, downstream_gene_variant = 16,
-  TF_binding_site_variant = 17, regulatory_region_variant = 17,
-  regulatory_region = 17,
+  TF_binding_site_variant = 17, TFBS_ablation = 17, TFBS_amplification = 17,
+  regulatory_region_variant = 17, regulatory_region_ablation = 17,
+  regulatory_region_amplification = 17, regulatory_region = 17,
+  feature_elongation = 18, feature_truncation = 18,
   intergenic_variant = 19, intergenic_region = 19
 )
+
+# Unmapped SO terms are collected here and reported once by report_unmapped(),
+# not warned about inline: pick_effect and so_to_maf run once per variant, so a
+# single unmapped term in a real cohort would emit one warning per row and R
+# collapses anything past 50 into "There were 50 or more warnings", losing the
+# term names. The two buckets are distinct failures -- a term absent from
+# effect_priority, versus a ranked term with no so_to_maf branch.
+unmapped <- new.env(parent = emptyenv())
+unmapped$priority <- character()
+unmapped$class    <- character()
+
+note_unmapped <- function(bucket, terms) {
+  assign(bucket, union(get(bucket, envir = unmapped), terms), envir = unmapped)
+  invisible(NULL)
+}
+
+report_unmapped <- function() {
+  if (length(unmapped$priority))
+    warning("[combined_to_maf] SO term(s) absent from effect_priority, ranked ",
+            "last within their consequence list: ",
+            paste(sort(unmapped$priority), collapse = ", "),
+            "; refresh effect_priority and so_to_maf from vcf2maf.pl",
+            call. = FALSE)
+  if (length(unmapped$class))
+    warning("[combined_to_maf] SO term(s) with no Variant_Classification, ",
+            "written as Targeted_Region: ",
+            paste(sort(unmapped$class), collapse = ", "),
+            "; add them to so_to_maf", call. = FALSE)
+  invisible(NULL)
+}
 
 pick_effect <- function(consequence) {
   if (is.na(consequence) || consequence == "") return("")
@@ -50,6 +88,10 @@ pick_effect <- function(consequence) {
   terms <- terms[terms != ""]
   if (length(terms) == 0) return("")
   pr <- effect_priority[terms]
+  # An unmapped term still ranks last, as in vcf2maf, but must be reported here:
+  # once the fill below runs it loses to any known term in the same list and
+  # never reaches so_to_maf, so this is the only place it is visible.
+  if (anyNA(pr)) note_unmapped("priority", terms[is.na(pr)])
   pr[is.na(pr)] <- 99L
   terms[which.min(pr)]
 }
@@ -79,9 +121,13 @@ so_to_maf <- function(effect, var_type, inframe) {
   if (effect %in% c("transcript_amplification", "intron_variant",
                     "intragenic_variant", "INTRAGENIC"))
     return("Intron")
-  if (effect == "splice_region_variant") return("Splice_Region")
+  if (effect %in% c("splice_region_variant", "splice_donor_5th_base_variant",
+                    "splice_donor_region_variant",
+                    "splice_polypyrimidine_tract_variant"))
+    return("Splice_Region")
   if (effect %in% c("incomplete_terminal_codon_variant", "synonymous_variant",
-                    "stop_retained_variant", "NMD_transcript_variant"))
+                    "stop_retained_variant", "start_retained_variant",
+                    "NMD_transcript_variant"))
     return("Silent")
   if (effect %in% c("mature_miRNA_variant", "exon_variant",
                     "non_coding_exon_variant", "non_coding_transcript_exon_variant",
@@ -89,17 +135,26 @@ so_to_maf <- function(effect, var_type, inframe) {
     return("RNA")
   if (effect %in% c("5_prime_UTR_variant")) return("5'UTR")
   if (effect == "3_prime_UTR_variant") return("3'UTR")
-  if (effect %in% c("TF_binding_site_variant", "regulatory_region_variant",
-                    "regulatory_region", "intergenic_variant", "intergenic_region"))
+  if (effect %in% c("TF_binding_site_variant", "TFBS_ablation",
+                    "TFBS_amplification", "regulatory_region_variant",
+                    "regulatory_region_ablation",
+                    "regulatory_region_amplification", "regulatory_region",
+                    "feature_elongation", "feature_truncation",
+                    "intergenic_variant", "intergenic_region"))
     return("IGR")
   if (effect == "upstream_gene_variant") return("5'Flank")
   if (effect == "downstream_gene_variant") return("3'Flank")
+  if (effect != "") note_unmapped("class", effect)
   "Targeted_Region"
 }
 
 # --- VCF-style allele -> MAF allele + Start/End + Variant_Type --------------
 # Trims a shared suffix then a shared prefix (keeps left alignment), emits "-"
 # for the empty side of a simple indel, and recomputes coordinates.
+# This coordinate/allele transformation is intentional and deviates from the
+# VCF-style Position/Variant fields in combined_snvs.tsv, so MAF coordinates are
+# NOT a valid join key back to that table. Join on
+# Tumor_Sample_Barcode + vcf_position + vcf_variant instead.
 normalize_allele <- function(pos, ref, alt) {
   pos <- as.integer(pos)
   ref <- toupper(ref)
@@ -147,8 +202,12 @@ aa3to1 <- c(Ala = "A", Arg = "R", Asn = "N", Asp = "D", Cys = "C", Gln = "Q",
 shorten_hgvsp <- function(x) {
   if (is.na(x) || x == "") return("")
   x <- sub("^[^:]*:", "", x)  # drop ENSP..: transcript prefix if present
-  for (i in seq_along(aa3to1))
-    x <- gsub(names(aa3to1)[i], aa3to1[[i]], x, fixed = TRUE)
+  m <- gregexpr("[A-Z][a-z]{2}", x, perl = TRUE)
+  regmatches(x, m) <- lapply(regmatches(x, m), function(z) {
+    hit <- z %in% names(aa3to1)
+    z[hit] <- aa3to1[z[hit]]
+    z
+  })
   x
 }
 
@@ -156,8 +215,9 @@ maf_cols <- c(
   "Hugo_Symbol", "Entrez_Gene_Id", "Center", "NCBI_Build", "Chromosome",
   "Start_Position", "End_Position", "Strand", "Variant_Classification",
   "Variant_Type", "Reference_Allele", "Tumor_Seq_Allele1", "Tumor_Seq_Allele2",
-  "Tumor_Sample_Barcode", "HGVSc", "HGVSp", "HGVSp_Short", "Transcript_ID",
-  "t_depth", "t_ref_count", "t_alt_count", "tumor_vaf"
+  "Tumor_Sample_Barcode", "HGVSc", "HGVSp", "HGVSp_Short",
+  "Gene", "Transcript_ID", "t_depth", "t_ref_count", "t_alt_count", "tumor_vaf",
+  "vcf_position", "vcf_variant"
 )
 
 snv <- suppressWarnings(read_tsv(in_tsv, show_col_types = FALSE,
@@ -187,7 +247,14 @@ inframe <- (abs(nchar(ref_in) - nchar(alt_in)) %% 3L) == 0L
 effect <- vapply(g("Consequence"), pick_effect, character(1), USE.NAMES = FALSE)
 var_type <- vapply(norm, `[[`, character(1), "type")
 vclass <- mapply(so_to_maf, effect, var_type, inframe, USE.NAMES = FALSE)
+report_unmapped()
 
+# Hugo_Symbol falls back to the Ensembl gene ID, not to a shared "Unknown".
+# maftools keys every per-gene summary on Hugo_Symbol, so one literal for all
+# unnamed features collapses unrelated loci into a single row in oncoplots and
+# gene summaries. The ENSG keeps them distinct; "Unknown" is left for the rows
+# VEP gave no feature at all, mostly intergenic calls, which are genuinely not
+# attributable to a gene. The Gene column below carries the ENSG either way.
 symbol <- g("SYMBOL")
 gene   <- g("Gene")
 hugo <- ifelse(!is.na(symbol) & symbol != "", symbol,
@@ -211,11 +278,14 @@ maf <- tibble(
   HGVSc                 = g("HGVSc"),
   HGVSp                 = g("HGVSp"),
   HGVSp_Short           = vapply(g("HGVSp"), shorten_hgvsp, character(1), USE.NAMES = FALSE),
+  Gene                  = gene,  # Ensembl gene ID, also the Hugo_Symbol fallback
   Transcript_ID         = g("Feature"),
   t_depth               = g("DP_tumor"),
   t_ref_count           = g("AD_REF_tumor"),
   t_alt_count           = g("AD_ALT_tumor"),
-  tumor_vaf             = g("AF_tumor")
+  tumor_vaf             = g("AF_tumor"),
+  vcf_position          = g("Position"),
+  vcf_variant           = g("Variant")
 )
 
 write_maf(maf)

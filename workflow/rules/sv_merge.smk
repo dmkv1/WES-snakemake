@@ -63,6 +63,8 @@ rule annotate_merged_sv:
         genome_build=config["refs"]["annotsv_annotations"]["genome_build"],
         output_prefix="work/sv_merge/{run}/{sample}/{sample}.SV.annotated",
     threads: 1
+    benchmark:
+        "work/benchmarks/annotate_merged_sv/{run}_{sample}.tsv",
     conda:
         "../envs/annotsv.yaml"
     log:

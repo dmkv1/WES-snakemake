@@ -14,6 +14,8 @@ rule fastp_trim:
             if config["params"]["fastp"]["detect_adapter_for_pe"]
             else ""
         ),
+    benchmark:
+        "work/benchmarks/fastp_trim/{run}_{sample}.{unit}.tsv",
     conda:
         "../envs/fastp.yaml"
     log:
@@ -58,9 +60,17 @@ rule bwa_map:
         temp("results/{run}/{sample}/bam/units/{sample}.{unit}.qgrp.bam"),
     params:
         rg=get_read_group,
+    benchmark:
+        "work/benchmarks/bwa_map/{run}_{sample}.{unit}.tsv",
     conda:
         "../envs/bwamem.yaml"
     threads: config["resources"]["threads"]
+    resources:
+        # The hg38 BWA index is ~5.5 GB resident and shared across threads; the
+        # rest is per-thread alignment buffers plus the piped samtools fixmate.
+        mem_mb=12288,
+        # Writes a full BAM per unit; see apply_base_recalibration.
+        io_heavy=1,
     log:
         "work/logs/bwamem_{run}_{sample}.{unit}.log",
     shell:
@@ -88,9 +98,13 @@ rule mark_duplicates:
         tmp_dir="tmp",
         inputs=lambda wildcards, input: " ".join(f"-I {b}" for b in input),
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["markdup"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["markdup"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["markdup"]["mem_mb"],
+        # Reads every unit BAM and writes a full BAM; see apply_base_recalibration.
+        io_heavy=1,
+    benchmark:
+        "work/benchmarks/mark_duplicates/{run}_{sample}.tsv",
     log:
         "work/logs/MarkDuplicates_{run}_{sample}.log",
     container:
@@ -121,8 +135,10 @@ def _sort_mem_mb():
         mb = {"K": value / 1024, "M": value, "G": value * 1024}[unit]
     else:
         mb = float(raw) / (1024 * 1024)  # a bare number is bytes, as in samtools
-    # 15% above the buffers themselves, for the merge pass and the BGZF output.
-    return int(mb * config["resources"]["threads"] * 1.15)
+    # 30% above the buffers themselves. samtools spends the full per-thread
+    # buffer and then carries the merge pass and the BGZF output on top, which
+    # measures at roughly 11% over the buffers on a WES BAM; the rest is margin.
+    return int(mb * config["resources"]["threads"] * 1.3)
 
 
 # The one coordinate sort. --write-index with the ##idx## form names the index
@@ -137,11 +153,15 @@ rule sort_bam:
     params:
         sort_mem=config["resources"]["sort_mem"],
         tmp_dir="tmp",
+    benchmark:
+        "work/benchmarks/sort_bam/{run}_{sample}.tsv",
     conda:
         "../envs/bwamem.yaml"
     threads: config["resources"]["threads"]
     resources:
         mem_mb=_sort_mem_mb(),
+        # Reads a full BAM and writes a full BAM; see apply_base_recalibration.
+        io_heavy=1,
     log:
         "work/logs/sort_bam_{run}_{sample}.log",
     shell:
@@ -171,9 +191,11 @@ rule create_base_recalibration:
         ),
         interval_padding=config["params"]["bqsr"]["interval_padding"],
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["light"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["light"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["light"]["mem_mb"],
+    benchmark:
+        "work/benchmarks/create_base_recalibration/{run}_{sample}.tsv",
     log:
         "work/logs/BaseRecalibrator_{run}_{sample}.log",
     container:
@@ -207,9 +229,16 @@ rule apply_base_recalibration:
         tmp_dir="tmp",
         ref_path=config["refs"]["path"],
     resources:
-        java_max_gb=config["resources"]["java_max_gb"],
-        java_min_gb=config["resources"]["java_min_gb"],
-        mem_mb=config["resources"]["mem_mb"],
+        java_max_gb=config["resources"]["gatk"]["light"]["java_max_gb"],
+        java_min_gb=config["resources"]["gatk"]["light"]["java_min_gb"],
+        mem_mb=config["resources"]["gatk"]["light"]["mem_mb"],
+        # Reads a full BAM and writes a full BAM. The light tier no longer caps
+        # this rule, so io_heavy is what keeps the HDD array off a frontier of
+        # dozens of concurrent whole-BAM rewrites, which seek-thrash rather than
+        # deliver throughput.
+        io_heavy=1,
+    benchmark:
+        "work/benchmarks/apply_base_recalibration/{run}_{sample}.tsv",
     log:
         "work/logs/ApplyBQSR_{run}_{sample}.log",
     container:
@@ -242,6 +271,8 @@ rule mosdepth:
         thresholds="results/metrics/{run}/{sample}.thresholds.bed.gz",
     params:
         prefix="results/metrics/{run}/{sample}",
+    benchmark:
+        "work/benchmarks/mosdepth/{run}_{sample}.tsv",
     conda:
         "../envs/qc.yaml"
     log:

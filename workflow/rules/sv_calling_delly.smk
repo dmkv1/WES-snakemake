@@ -34,7 +34,9 @@ rule run_delly:
     # per sample and no more: two for a paired run, one tumor-only.
     threads: lambda wildcards: 1 if is_tumor_only(wildcards) else 2
     resources:
-        mem_mb=config["resources"]["mem_mb"],
+        mem_mb=config["resources"]["delly_mem_mb"],
+    benchmark:
+        "work/benchmarks/run_delly/{run}_{sample}.tsv",
     container:
         config["containers"]["delly"]
     log:

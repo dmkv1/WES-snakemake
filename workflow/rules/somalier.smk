@@ -12,6 +12,8 @@ rule somalier_extract:
         "work/somalier/{run}/{sample}.somalier",
     params:
         out_dir=lambda w: f"work/somalier/{w.run}",
+    benchmark:
+        "work/benchmarks/somalier_extract/{run}_{sample}.tsv",
     log:
         "work/logs/somalier_extract_{run}_{sample}.log",
     conda:

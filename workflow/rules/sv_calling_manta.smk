@@ -12,8 +12,16 @@ rule cap_manta_bam_quality:
     output:
         bam=temp("work/manta/{run}/{sample}/{sample}.bqcap.bam"),
         bai=temp("work/manta/{run}/{sample}/{sample}.bqcap.bam.bai"),
+    benchmark:
+        "work/benchmarks/cap_manta_bam_quality/{run}_{sample}.tsv",
     conda:
         "../envs/pysam.yaml"
+    resources:
+        # A single-threaded pysam pass: the BAM streams through, so the process
+        # holds little beyond the pysam buffers.
+        mem_mb=1024,
+        # Reads a full BAM and writes a full BAM; see apply_base_recalibration.
+        io_heavy=1,
     script:
         "../scripts/cap_base_quality.py"
 
@@ -49,10 +57,12 @@ rule run_manta:
         ),
         # Tumor-only outputs tumorSV.vcf.gz, paired outputs somaticSV.vcf.gz
         sv_output_name=lambda w: "tumorSV" if is_tumor_only(w) else "somaticSV",
-    threads: config["resources"]["threads"]
+    threads: config["resources"]["manta_threads"]
     resources:
         mem_gb=config["resources"]["manta_max_gb"],
         mem_mb=config["resources"]["manta_mem_mb"],
+    benchmark:
+        "work/benchmarks/run_manta/{run}_{sample}.tsv",
     conda:
         "../envs/manta.yaml"
     log:

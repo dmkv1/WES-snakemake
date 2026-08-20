@@ -10,6 +10,8 @@ rule build_xengsort_index:
         size=config["params"]["xengsort"]["index_size"],
         fill=config["params"]["xengsort"]["index_fill"],
         k=config["params"]["xengsort"]["index_k"],
+    benchmark:
+        "work/benchmarks/build_xengsort_index/index.tsv",
     conda:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
@@ -42,6 +44,8 @@ rule run_xengsort:
         chunksize=config["params"]["xengsort"]["chunksize"],
         prefetch=config["params"]["xengsort"]["prefetch"],
         display_name=get_unit_display_name,
+    benchmark:
+        "work/benchmarks/run_xengsort/{run}_{sample}.{unit}.tsv",
     conda:
         "../envs/xengsort.yaml"
     threads: config["resources"]["threads"]
