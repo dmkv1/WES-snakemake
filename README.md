@@ -247,9 +247,10 @@ and `multiqc_config.yaml` are relative paths.
 Snakemake process ID in `snakemake.pid` and removes that file when the run ends.
 `stop.sh` reads `snakemake.pid` and sends `SIGTERM`.
 
-`profiles/default/config.yaml` holds the run settings: 16 cores and a 56 GB memory limit.
-The defaults assume a 16-thread host with 64 GB of RAM. Scale the profile and the
-`resources` block in `config.yaml` together, because the two must agree. The profile has
+`profiles/default/config.yaml` holds the run settings: 32 cores, a 240 GB memory limit
+and `io_heavy: 4`, the cap on concurrent whole-BAM rewrites. The defaults take half of a
+64-thread, 504 GB host. Scale the profile and the `resources` block in `config.yaml`
+together, because the two must agree. The profile has
 no retry setting, so a failed job does not run again.
 
 ### Tests

@@ -167,7 +167,7 @@ resources:
   # each one to the cores the host actually has, so these do not need editing
   # for a smaller machine.
   mutect2_threads: 8
-  haplotypecaller_threads: 16
+  haplotypecaller_threads: 12
   manta_threads: 8
   vep_threads: 4
   delly_mem_mb: 4096
@@ -176,36 +176,44 @@ resources:
   # GATK memory tiers. Each tier is a JVM heap window plus the mem_mb the
   # scheduler reserves against the profile budget: the heap ceiling plus 25%
   # non-heap overhead. java_min_gb starts small; the JVM grows to java_max_gb on
-  # demand. The figures are absolute and do not scale with threads. Rules pick a
-  # tier by real peak heap on a WES BAM, so that the per-sample stages, which use
-  # 2-4 GB, do not each reserve the largest figure and throttle the run to a
-  # handful of concurrent jobs.
+  # demand. The figures are absolute and do not scale with threads.
+  #
+  # A tier ceiling is roughly 2.5x the max_rss its rules recorded in
+  # work/benchmarks/<rule>/*.tsv on a 9 GB WES BAM. A JVM only grows to what it
+  # needs, so the measured peak, not the ceiling it was given, is what a rule
+  # actually costs; sizing off the ceiling made every per-sample stage reserve
+  # the largest figure and throttled the run to a handful of concurrent jobs.
+  # After a cohort at different coverage, re-read the benchmarks and move a rule
+  # between tiers rather than widening a tier.
   gatk:
     # BedToIntervalList, CollectHsMetrics, BaseRecalibrator, ApplyBQSR,
     # GetPileupSummaries, CalculateContamination, FilterMutectCalls,
-    # CollectAllelicCounts.
+    # CollectAllelicCounts. Measured 1-3 GB.
     light:
       java_min_gb: 2
       java_max_gb: 8
       mem_mb: 10240
-    # HaplotypeCaller and LearnReadOrientationModel, which reads every f1r2
-    # tar of a sample into memory at once.
+    # HaplotypeCaller, 4 GB measured, and LearnReadOrientationModel, 3 GB, which
+    # reads every f1r2 tar of a sample into memory at once.
     medium:
       java_min_gb: 4
-      java_max_gb: 16
-      mem_mb: 20480
-    # MarkDuplicates peaks near 15 GB on a 9 GB WES BAM, the peak tracks the duplicate-set
-    # index, which grows with library complexity, so it holds a heap window of its own.
+      java_max_gb: 12
+      mem_mb: 15360
+    # MarkDuplicates measured 15 GB on a 9 GB WES BAM against a 16 GB ceiling,
+    # so it is the one rule whose true demand the benchmark did not bound. The
+    # peak tracks the duplicate-set index, which grows with library complexity,
+    # so it keeps a heap window of its own, wider than the 2.5x rule.
     markdup:
       java_min_gb: 4
       java_max_gb: 24
       mem_mb: 30720
     # Mutect2, which holds the active-region assembly graphs for a paired
-    # tumor/normal WES pair across every worker thread.
+    # tumor/normal WES pair across every worker thread. Measured 6 GB over a
+    # two-hour paired call.
     heavy:
       java_min_gb: 8
-      java_max_gb: 32
-      mem_mb: 40960
+      java_max_gb: 16
+      mem_mb: 20480
   # Manta parcels the call out to its own task scheduler under --jobs and holds
   # under 1 GB in the parent process, so --memGb is a ceiling for that scheduler
   # rather than a heap it fills. manta_max_gb stays at or under 0.8 of

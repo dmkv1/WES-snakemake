@@ -249,8 +249,16 @@ var_type <- vapply(norm, `[[`, character(1), "type")
 vclass <- mapply(so_to_maf, effect, var_type, inframe, USE.NAMES = FALSE)
 report_unmapped()
 
+# Hugo_Symbol falls back to the Ensembl gene ID, not to a shared "Unknown".
+# maftools keys every per-gene summary on Hugo_Symbol, so one literal for all
+# unnamed features collapses unrelated loci into a single row in oncoplots and
+# gene summaries. The ENSG keeps them distinct; "Unknown" is left for the rows
+# VEP gave no feature at all, mostly intergenic calls, which are genuinely not
+# attributable to a gene. The Gene column below carries the ENSG either way.
 symbol <- g("SYMBOL")
-hugo <- ifelse(!is.na(symbol) & symbol != "", symbol, "Unknown")
+gene   <- g("Gene")
+hugo <- ifelse(!is.na(symbol) & symbol != "", symbol,
+               ifelse(!is.na(gene) & gene != "", gene, "Unknown"))
 
 maf <- tibble(
   Hugo_Symbol           = hugo,
@@ -270,7 +278,7 @@ maf <- tibble(
   HGVSc                 = g("HGVSc"),
   HGVSp                 = g("HGVSp"),
   HGVSp_Short           = vapply(g("HGVSp"), shorten_hgvsp, character(1), USE.NAMES = FALSE),
-  Gene                  = g("Gene"),  # Ensembl gene ID; sole identifier where Hugo_Symbol is "Unknown"
+  Gene                  = gene,  # Ensembl gene ID, also the Hugo_Symbol fallback
   Transcript_ID         = g("Feature"),
   t_depth               = g("DP_tumor"),
   t_ref_count           = g("AD_REF_tumor"),
