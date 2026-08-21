@@ -54,6 +54,13 @@ rule filter_merged_sv_size:
 rule annotate_merged_sv:
     # AnnotSV over the consensus VCF. SURVIVOR's SUPP/SUPP_VEC ride through in the
     # INFO column. Empty-VCF guard mirrors the former Manta annotate_sv.
+    #
+    # -SVminSize overrides AnnotSV's own default (50bp), which otherwise silently
+    # drops any DEL/DUP/INS below it — no warning in the log, only a per-variant
+    # line in a *.SV.unannotated.tsv byproduct AnnotSV writes next to the output
+    # and that this rule does not declare/track. survivor_min_size (merge step)
+    # already reads as "no minimum"; annotsv_min_size makes that intent hold true
+    # all the way to the annotated table instead of being overridden invisibly.
     input:
         vcf="work/sv_merge/{run}/{sample}/{sample}.SV.merged.sizefilt.vcf",
     output:
@@ -61,6 +68,7 @@ rule annotate_merged_sv:
     params:
         annotations=config["refs"]["annotsv_annotations"]["path"],
         genome_build=config["refs"]["annotsv_annotations"]["genome_build"],
+        min_size=config["params"]["delly"]["annotsv_min_size"],
         output_prefix="work/sv_merge/{run}/{sample}/{sample}.SV.annotated",
     threads: 1
     benchmark:
@@ -82,6 +90,7 @@ rule annotate_merged_sv:
             -outputFile {params.output_prefix} \
             -genomeBuild {params.genome_build} \
             -annotationsDir {params.annotations} \
+            -SVminSize {params.min_size} \
             > {log} 2>&1
         fi
         """

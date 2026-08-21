@@ -287,10 +287,22 @@ if (!exists("CNVs.df")) {
 # per-gene "split" rows stay in the on-disk TSV but would flood the sheet (a
 # single large SV overlaps hundreds of genes). Decode SURVIVOR's SUPP_VEC
 # (bit 1 = Manta, bit 2 = DELLY) into a readable SV_callers column.
+#
+# SV_chrom2 (INFO CHR2) is the only place the partner chromosome survives for
+# TRA/BND calls — SV_chrom/SV_start/SV_end from AnnotSV collapse a
+# translocation to its first breakend, indistinguishable from an intra-
+# chromosomal event without it. Equal to SV_chrom for every other SV type.
+#
+# SV_DR_ref/SV_DR_alt are the tumor sample's own FORMAT DR ("# supporting
+# reference,variant reads in that order", SURVIVOR spec), passed through
+# unmodified from whichever caller(s) support the consensus call — not a
+# native AF field (SURVIVOR/AnnotSV never compute one); derive one downstream
+# as SV_DR_alt / (SV_DR_ref + SV_DR_alt) where SV_DR_ref + SV_DR_alt > 0.
 sv_report_cols <- c(
-  "SV_callers", "AnnotSV_ID", "SV_chrom", "SV_start", "SV_end",
+  "SV_callers", "AnnotSV_ID", "SV_chrom", "SV_chrom2", "SV_start", "SV_end",
   "SV_length", "SV_type", "Gene_count", "Gene_name", "FILTER",
-  "AnnotSV_ranking_score", "ACMG_class", "AnnotSV_ranking_criteria"
+  "AnnotSV_ranking_score", "ACMG_class", "AnnotSV_ranking_criteria",
+  "SV_DR_ref", "SV_DR_alt"
 )
 
 SVs.raw <- tryCatch(
@@ -312,6 +324,56 @@ if (nrow(SVs.raw) > 0 && "Annotation_mode" %in% names(SVs.raw)) {
     bits <- strsplit(v, "")[[1]] == "1"
     paste(caller_names[seq_along(bits)][bits], collapse = ";")
   }, character(1))
+
+  SVs.df$SV_chrom2 <- ifelse(
+    grepl("CHR2=", SVs.df$INFO),
+    sub(".*CHR2=([^;]+).*", "\\1", SVs.df$INFO),
+    NA_character_
+  )
+
+  # TRA/BND: AnnotSV can emit two "full" rows per event, a primary record plus
+  # a synthesized "BNDrescue" mate at the other breakend (tagged in INFO). The
+  # rescue row copies the primary's INFO verbatim, so its own CHR2 is
+  # self-referential (points at itself) rather than at the true partner.
+  # Collapse each primary/rescue pair (sharing the raw VCF ID column) into the
+  # primary row, whose CHR2 is correct, and drop the now-redundant rescue row.
+  # A rescue row without a surviving primary mate is kept — it is the only
+  # record of that event — but its SV_chrom2 is unresolvable from its own
+  # INFO, so it is cleared to NA rather than left silently wrong.
+  is_rescue <- grepl("BNDrescue", SVs.df$INFO)
+  if (any(is_rescue)) {
+    primary_chrom_by_id <- setNames(SVs.df$SV_chrom[!is_rescue], SVs.df$ID[!is_rescue])
+    rescue_has_primary <- is_rescue & SVs.df$ID %in% names(primary_chrom_by_id)
+    SVs.df$SV_chrom2[is_rescue & !rescue_has_primary] <- NA_character_
+    SVs.df <- SVs.df[!rescue_has_primary, ]
+  }
+
+  # Tumor genotype column is named by sample ID (SURVIVOR/AnnotSV carry the
+  # VCF sample columns through verbatim), matching this rule's own {sample}
+  # wildcard. FORMAT key order is not guaranteed fixed, so look up DR's
+  # position per row rather than assuming it.
+  tumor_col <- snakemake@wildcards[["sample"]]
+  if (tumor_col %in% names(SVs.df) && "FORMAT" %in% names(SVs.df)) {
+    format_keys <- strsplit(SVs.df$FORMAT, ":")
+    geno_vals   <- strsplit(SVs.df[[tumor_col]], ":")
+    dr_idx <- vapply(format_keys, function(k) {
+      i <- match("DR", k)
+      if (is.na(i)) NA_integer_ else i
+    }, integer(1))
+    dr_str <- mapply(function(v, i) {
+      if (is.na(i) || i > length(v)) NA_character_ else v[i]
+    }, geno_vals, dr_idx)
+    dr_split <- strsplit(dr_str, ",")
+    SVs.df$SV_DR_ref <- suppressWarnings(as.integer(vapply(
+      dr_split, function(x) if (length(x) >= 1) x[1] else NA_character_, character(1)
+    )))
+    SVs.df$SV_DR_alt <- suppressWarnings(as.integer(vapply(
+      dr_split, function(x) if (length(x) >= 2) x[2] else NA_character_, character(1)
+    )))
+  } else {
+    SVs.df$SV_DR_ref <- NA_integer_
+    SVs.df$SV_DR_alt <- NA_integer_
+  }
 
   # Fixed report schema (stable across samples for downstream row-binding).
   SVs.df <- SVs.df %>% dplyr::select(dplyr::any_of(sv_report_cols))

@@ -112,6 +112,11 @@ params:
       # SURVIVOR merge of Manta + DELLY SV calls (consensus).
       survivor_max_dist: 1000  # max breakpoint distance (bp) to call two SVs the same
       survivor_min_size: 0     # min SV size to keep in the merge (0 = no size filter)
+      # AnnotSV's own -SVminSize, applied after the merge (DEL/DUP/INS only; INV
+      # and TRA/BND are not size-gated here). AnnotSV defaults this to 50bp and
+      # silently drops anything smaller with no warning in the log. 1 matches the
+      # "no minimum" intent of survivor_min_size above.
+      annotsv_min_size: 1
       # Drop megabase intra-chromosomal SVs from the consensus before annotation:
       # WES SV callers (esp. DELLY off-target split/PE reads) produce spurious
       # multi-Mb INV/DUP that span hundreds of genes; large CNVs are covered by
