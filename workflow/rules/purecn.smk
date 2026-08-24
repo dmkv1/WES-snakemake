@@ -99,7 +99,9 @@ rule purecn_run:
 
 rule resolve_purity_source:
     """Single decision point for the purity/ploidy that cnvkit_call and
-    combine_results consume, in priority order:
+    combine_results consume.
+
+    Purity, in priority order:
       1. 'known'        — samplesheet tumor_fraction (orthogonal ground truth:
                           sorting/cytometry, PDX=1). Overrides PureCN.
       2. 'purecn'       — PureCN's estimate, IF it ran, did not Fail, and its
@@ -109,6 +111,21 @@ rule resolve_purity_source:
       3. 'assumed_pure' — no known value and no usable PureCN estimate: purity 1
                           (cnvkit calls unrescaled, as in the pre-PureCN default;
                           e.g. tumor-only samples).
+
+    Ploidy (tracked separately as ploidy_source, resolved independently of the
+    purity source above — see the 2026-08-24 notebook entries for why a
+    sample can be e.g. purity 'assumed_pure' + ploidy 'purecn' at once), in
+    priority order:
+      1. 'known'   — samplesheet known_ploidy (orthogonal ground truth:
+                     karyotype, flow DNA index). Overrides PureCN. Added after
+                     P038 PDCL: karyotype ~42 chr (near-diploid, one wrongly
+                     tetraploid subclone) but PureCN fit ploidy 3 anyway (POOR
+                     GOF alone doesn't reject a PureCN estimate) — corroborated
+                     wrong by an independent BCL2 FISH-vs-WES discordance.
+      2. 'purecn'  — PureCN's raw Ploidy, IF it ran and did not Fail (no flag
+                     check — flags gate purity usability, not ploidy).
+      3. 'default' — no known value and no usable PureCN estimate: diploid (2).
+
     Both consumers read this one sidecar, so they can never disagree on the
     value actually used."""
     input:
@@ -122,6 +139,7 @@ rule resolve_purity_source:
         eligible=is_purecn_eligible,
         use_purecn=config["params"]["cnv"]["use_purecn_purity"],
         known=get_known_purity,
+        known_ploidy=get_known_ploidy,
     log:
         "work/logs/resolve_purity_source_{run}_{sample}.log",
     run:
@@ -155,19 +173,16 @@ rule resolve_purity_source:
             )
 
         # Integer baseline ploidy for cnvkit --ploidy (which is type=int) and the
-        # QC table, resolved independently of the purity source. PureCN reports
-        # only a continuous Ploidy, so round it half-up to the nearest integer
-        # (min 1); fall back to diploid when PureCN did not run, failed, or
-        # produced no usable value.
+        # QC table. PureCN reports only a continuous Ploidy, so round it half-up
+        # to the nearest integer (min 1); fall back to diploid when PureCN did
+        # not run, failed, or produced no usable value. No flag check here (see
+        # docstring) — flags gate purity usability, not this rounding step.
         def round_ploidy(val):
             try:
                 p = float(val)
             except (TypeError, ValueError):
                 return None
             return max(1, int(p + 0.5)) if p > 0 else None
-
-        ploidy_int = None if purecn_failed else round_ploidy(purecn_ploidy)
-        ploidy = str(ploidy_int) if ploidy_int is not None else "2"
 
         known = params.known  # float in (0,1] or None
         if known is not None:
@@ -176,6 +191,15 @@ rule resolve_purity_source:
             purity, source = purecn_purity, "purecn"
         else:
             purity, source = "1", "assumed_pure"
+
+        known_ploidy = params.known_ploidy  # int or None
+        purecn_ploidy_int = None if purecn_failed else round_ploidy(purecn_ploidy)
+        if known_ploidy is not None:
+            ploidy, ploidy_source = str(known_ploidy), "known"
+        elif purecn_ploidy_int is not None:
+            ploidy, ploidy_source = str(purecn_ploidy_int), "purecn"
+        else:
+            ploidy, ploidy_source = "2", "default"
 
         os.makedirs(os.path.dirname(output.purity_csv), exist_ok=True)
         with open(output.purity_csv, "w", newline="") as fh:
@@ -187,7 +211,9 @@ rule resolve_purity_source:
                     "purity",
                     "ploidy",
                     "source",
+                    "ploidy_source",
                     "tumor_fraction",
+                    "known_ploidy",
                     "purecn_purity",
                     "purecn_ploidy",
                     "purecn_flagged",
@@ -202,7 +228,9 @@ rule resolve_purity_source:
                     "purity": purity,
                     "ploidy": ploidy,
                     "source": source,
+                    "ploidy_source": ploidy_source,
                     "tumor_fraction": "" if known is None else known,
+                    "known_ploidy": "" if known_ploidy is None else known_ploidy,
                     "purecn_purity": purecn_purity,
                     "purecn_ploidy": purecn_ploidy,
                     "purecn_flagged": purecn_flagged,

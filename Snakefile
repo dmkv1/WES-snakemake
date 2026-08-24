@@ -115,6 +115,17 @@ for _, row in samples.iterrows():
     tf = None if pd.isna(val) or str(val).strip() in ("", "NA") else float(val)
     tumor_fraction_dict.setdefault(row["ID"], {})[row["sample"]] = tf
 
+# known_ploidy: orthogonal/measured ploidy (karyotype, flow DNA index), used as
+# ground truth for cnvkit --ploidy when present, ahead of PureCN's own fit. Blank/NA
+# means unknown -> resolve_purity_source falls back to PureCN, then to diploid (see
+# purecn.smk). Stored as int or None; build_units has already validated it's a
+# positive integer.
+known_ploidy_dict = {}
+for _, row in samples.iterrows():
+    val = row["known_ploidy"]
+    kp = None if pd.isna(val) or str(val).strip() in ("", "NA") else int(float(val))
+    known_ploidy_dict.setdefault(row["ID"], {})[row["sample"]] = kp
+
 # Validate tumor-only runs have PON configured
 for run, data in runs_dict.items():
     if data["normal"] is None:
@@ -145,6 +156,7 @@ common.runs_dict = runs_dict
 common.pdx_dict = pdx_dict
 common.probe_dict = probe_dict
 common.tumor_fraction_dict = tumor_fraction_dict
+common.known_ploidy_dict = known_ploidy_dict
 common.config = config
 common.samples = samples
 

@@ -52,6 +52,14 @@ def get_known_purity(wildcards):
     return tumor_fraction_dict[wildcards.run][wildcards.sample]
 
 
+def get_known_ploidy(wildcards):
+    """Orthogonal/measured ploidy from the samplesheet (known_ploidy column),
+    or None when unknown. Ground truth for cnvkit ploidy (karyotype, flow DNA
+    index); when None, resolve_purity_source falls back to PureCN, then to
+    diploid."""
+    return known_ploidy_dict[wildcards.run][wildcards.sample]
+
+
 def is_paired_run(run):
     return runs_dict[run]["normal"] is not None
 

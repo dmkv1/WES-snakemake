@@ -53,7 +53,7 @@ RG_STRING_RE = re.compile(r"^@RG(\\t[A-Za-z][A-Za-z0-9]:[ -~]+)+$")
 # Columns that describe the sample, not the FASTQ pair. Every unit of a sample
 # must agree on them; disagreement is an operator error, not something to
 # silently resolve by picking a row.
-SAMPLE_COLUMNS = ["sample_type", "gender", "capture_kit", "tumor_fraction"]
+SAMPLE_COLUMNS = ["sample_type", "gender", "capture_kit", "tumor_fraction", "known_ploidy"]
 
 # Optional per-unit override columns. Absent in the current 8-column sheet.
 UNIT_COLUMNS = ["flowcell", "lane", "barcode", "library"]
@@ -292,6 +292,23 @@ def _validate_tumor_fraction(samples: pd.DataFrame) -> None:
                 f"(got {value!r}); 0 is not a valid tumor fraction")
 
 
+def _validate_known_ploidy(samples: pd.DataFrame) -> None:
+    for _, row in samples.iterrows():
+        value = row["known_ploidy"]
+        if _blank(value):
+            continue
+        try:
+            kp = float(value)
+        except (TypeError, ValueError):
+            raise SamplesheetError(
+                f"{row['sample']}: known_ploidy must be a positive integer or "
+                f"NA/blank (got {value!r})") from None
+        if kp <= 0 or kp != int(kp):
+            raise SamplesheetError(
+                f"{row['sample']}: known_ploidy must be a positive integer or "
+                f"NA/blank (got {value!r})")
+
+
 def build_units(sheet: pd.DataFrame, *, resolve_headers: bool = True,
                 strict: bool = False) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """Resolve a samplesheet into (units, samples_meta, warnings).
@@ -350,6 +367,7 @@ def build_units(sheet: pd.DataFrame, *, resolve_headers: bool = True,
 
     samples_meta = _collapse_samples(units, sheet_rows)
     _validate_tumor_fraction(samples_meta)
+    _validate_known_ploidy(samples_meta)
 
     units = units[UNIT_TABLE_COLUMNS].reset_index(drop=True)
     return units, samples_meta, warnings
