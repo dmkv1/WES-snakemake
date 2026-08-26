@@ -7,6 +7,46 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
+## [2.1.0] - 2026-08-26
+
+**This release changes `results/combined/combined_svs.tsv` and the per-sample
+`purity.csv` sidecar.** SVs below AnnotSV's default 50bp cutoff that were
+previously silently dropped are now kept; TRA/BND events that produced two rows
+(a primary plus AnnotSV's synthesized "BNDrescue" mate) now produce one. Ploidy
+for a sample with a `known_ploidy` samplesheet value can now differ from the
+prior PureCN-derived estimate. Re-run `combine_results` and `resolve_purity_source`
+before comparing against a 2.0.0 cohort. No `config.yaml` or samplesheet changes
+are required for existing setups — new keys/columns are optional and default to
+prior behavior.
+
+### Added
+
+* `known_ploidy` samplesheet column (optional). Orthogonal ground-truth ploidy
+  (karyotype, flow DNA index), resolved independently of purity and ahead of
+  PureCN's own fit, then PureCN, then diploid as before. Added after a PDCL
+  where PureCN fit ploidy 3 against a karyotype of ~42 chromosomes, corroborated
+  wrong by an independent FISH-vs-WES discordance; poor PureCN GOF alone hadn't
+  been enough to flag it.
+* `purity.csv` gains `ploidy_source` and `known_ploidy` columns, mirroring the
+  existing `source` / `tumor_fraction` pair for purity.
+* `params.delly.annotsv_min_size` in `config.yaml` (default 1). AnnotSV applies
+  its own 50bp size filter after the SURVIVOR merge regardless of
+  `survivor_min_size`, dropping smaller DEL/DUP/INS with no log warning. Set to
+  1 to make "no minimum" hold through annotation as well as merging.
+* `combined_svs.tsv` gains `SV_chrom2`, `SV_DR_ref` and `SV_DR_alt`. `SV_chrom2`
+  is the TRA/BND partner chromosome (AnnotSV's `SV_chrom` collapses a
+  translocation to its first breakend). `SV_DR_ref`/`SV_DR_alt` are the tumor
+  sample's supporting reference/variant read counts, passed through from
+  whichever caller(s) back the consensus call; derive an AF downstream as
+  `SV_DR_alt / (SV_DR_ref + SV_DR_alt)`.
+
+### Fixed
+
+* AnnotSV's "BNDrescue" mate row for a TRA/BND event copied the primary
+  record's INFO verbatim, including a self-referential `CHR2`. The rescue row
+  is now dropped whenever its primary survives; an orphaned rescue row is kept
+  but its `SV_chrom2` is cleared rather than left silently wrong.
+
 ## [2.0.0] - 2026-08-20
 
 **This release breaks existing setups.** The `resources` block of `config.yaml` is
