@@ -7,6 +7,19 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
+## [2.3.1] - 2026-09-15
+
+**This release changes CCF for every SNV that falls in a copy-number-altered
+region (deletion or amplification) — copy-neutral regions are unaffected.**
+`combine_results.R`'s CCF formula previously used only the tumor copy number:
+`CCF = AF × tumor_cn / (purity × expected_mutant_copies)`. This implicitly
+assumes normal-cell reads at the locus contribute zero copies, which is only
+true when `tumor_cn == normal_cn` (copy-neutral). In CNAs it biases CCF low in
+deletions and high in amplifications, and the bias grows as purity drops. The
+formula now follows Carter et al. 2012 (ABSOLUTE) and mixes both cell
+populations' copy number by purity:
+`CCF = AF × [purity×tumor_cn + (1-purity)×normal_cn] / (purity × expected_mutant_copies)`.
+
 ## [2.3.0] - 2026-09-15
 
 **This release changes CNV calls and CCF for every sample whose PureCN fit was

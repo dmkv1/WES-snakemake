@@ -208,29 +208,8 @@ if (length(vcf) == 0) {
     1  # Heterozygous (0/1, 1/0) - 1 copy mutant
   )
 
-  # Calculate CCF
-  # Formula: CCF = (observed_AF × tumor_cn) / (purity × expected_mutant_copies)
-  #
-  # Logic:
-  # - observed_AF = (mutant_reads) / (total_reads)
-  # - In pure tumor: AF = expected_mutant_copies / tumor_cn
-  # - With purity p: AF = (p × expected_mutant_copies/tumor_cn + (1-p) × 0)
-  #                     = p × expected_mutant_copies / tumor_cn
-  # - But if mutation is subclonal (present in fraction f of cancer cells):
-  #   AF = p × f × expected_mutant_copies / tumor_cn
-  # - Solving for f (which is CCF):
-  #   CCF = AF × tumor_cn / (p × expected_mutant_copies)
-  # Calculate CCF
-  # Formula: CCF = (observed_AF × purity × tumor_cn) / expected_mutant_copies
-
-  ccf <- (tumor_af * tumor_cn) / (purity * expected_mutant_copies)
-  ccf <- pmin(ccf, 1.0)  # Cap at 1.0 (100%)
-
-  # Add CCF columns to result
-  result_snv$expected_mutant_copies <- expected_mutant_copies
-  result_snv$CCF <- round(ccf, 3)
-
-  # Add normal CN
+  # Normal-cell copy number at the locus (sex-aware; needed by the CCF
+  # formula below, so this must be computed before it, not after).
   normal_cn <- ifelse(
     var_chr %in% c("chrX", "X") & sample_sex == "male", 1,  # X in males
     ifelse(
@@ -238,6 +217,31 @@ if (length(vcf) == 0) {
       ifelse(sample_sex == "male", 1, 0),  # Y in males=1, females=0
       2  # Autosomes default to diploid
     ))
+
+  # Calculate CCF (Carter et al. 2012 / ABSOLUTE formula)
+  # Formula: CCF = observed_AF × [purity×tumor_cn + (1-purity)×normal_cn] / (purity × expected_mutant_copies)
+  #
+  # Logic:
+  # - Total DNA copies at the locus in the sample = a mixture of tumor and
+  #   normal cells: purity×tumor_cn + (1-purity)×normal_cn. Using tumor_cn
+  #   alone (dropping the normal-cell term) is only correct in copy-neutral
+  #   regions where tumor_cn == normal_cn; it biases CCF low in deletions and
+  #   high in amplifications, worst at low purity.
+  # - observed_AF = mutant_reads / total_reads across that mixed copy number
+  # - For a mutation present in a fraction f of cancer cells (f == CCF):
+  #   AF = f × purity × expected_mutant_copies / [purity×tumor_cn + (1-purity)×normal_cn]
+  # - Solving for f:
+  #   CCF = AF × [purity×tumor_cn + (1-purity)×normal_cn] / (purity × expected_mutant_copies)
+
+  total_copies <- purity * tumor_cn + (1 - purity) * normal_cn
+  ccf <- (tumor_af * total_copies) / (purity * expected_mutant_copies)
+  ccf <- pmin(ccf, 1.0)  # Cap at 1.0 (100%)
+
+  # Add CCF columns to result
+  result_snv$expected_mutant_copies <- expected_mutant_copies
+  result_snv$CCF <- round(ccf, 3)
+
+  # Add normal CN
   result_snv$normal_cn <- normal_cn
 
   # Add tumor CN
