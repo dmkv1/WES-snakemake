@@ -349,7 +349,8 @@ rows are per unit. Every metric from the finished BAM has one row per sample.
 
 ### 6. Copy number variant calling
 
-**CNVkit** runs in the `etal/cnvkit:0.9.14` container.
+**CNVkit** runs in the `etal/cnvkit:0.9.14` container, patched for a segment-boundary
+bug (`containers/cnvkit/README.md`).
 
 * CNVkit calculates the coverage at the target and antitarget regions. It then corrects
   the coverage against the sex-matched panel reference for the capture kit.
@@ -376,8 +377,16 @@ One rule resolves the purity, and it uses this order:
 
 1. The samplesheet `tumor_fraction`, if the value is known.
 2. The PureCN estimate, if `params.cnv.use_purecn_purity` is true, PureCN ran, PureCN
-   did not report `Fail`, and its only flag is `POOR GOF`.
+   did not report `Fail`, and it produced a numeric purity. A PureCN flag (`LOW PURITY`,
+   `NON-ABERRANT`, `POOR GOF`, ...) does not reject the estimate — it is still the best
+   purity available, and forcing purity 1 instead only erases real copy-number signal.
 3. Purity 1 and ploidy 2.
+
+The result carries a `purity_confidence` column (`high` / `low_purity` / `unknown`) so
+downstream analysis can facet or footnote by it instead of silently blending a low- or
+unknown-confidence sample in: `unknown` for step 3 above (no real measurement at all),
+`low_purity` for any resolved purity below 0.30 (PureCN's own low-purity threshold),
+`high` otherwise.
 
 The result goes to `work/purity/{run}/{sample}/{sample}.purity.csv`. Both `cnvkit call`
 and the results report read this one file, so the two cannot disagree. PureCN runs for

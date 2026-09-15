@@ -60,6 +60,46 @@ def get_known_ploidy(wildcards):
     return known_ploidy_dict[wildcards.run][wildcards.sample]
 
 
+# Below this, PureCN's own fit ("LOW PURITY" comment) counts as unreliable
+# enough to flag downstream, but is still used — see resolve_purity below.
+PURITY_CONFIDENCE_THRESHOLD = 0.30
+
+
+def resolve_purity(known, purecn_purity, purecn_failed, purecn_available):
+    """Purity + source + confidence for one sample.
+
+    known: orthogonal ground-truth purity (float in (0,1]) or None.
+    purecn_purity: PureCN's raw Purity field ("", "NA", None, or numeric string).
+    purecn_failed: PureCN's own Failed flag.
+    purecn_available: PureCN enabled, eligible, and its output was produced.
+
+    Priority: known > purecn (any numeric fit, regardless of flag content —
+    a flagged purity is still the best estimate we have; forcing purity 1
+    instead only erases real CNA signal) > assumed_pure (purity 1, used only
+    when no measurement exists at all).
+
+    purity_confidence flags samples for cautious interpretation without
+    suppressing them: 'unknown' for assumed_pure (no real measurement),
+    'low_purity' for any resolved purity below PURITY_CONFIDENCE_THRESHOLD,
+    else 'high'.
+    """
+    if known is not None:
+        purity, source = str(known), "known"
+    elif purecn_available and not purecn_failed and purecn_purity not in ("", "NA", None):
+        purity, source = str(purecn_purity), "purecn"
+    else:
+        purity, source = "1", "assumed_pure"
+
+    if source == "assumed_pure":
+        confidence = "unknown"
+    elif float(purity) < PURITY_CONFIDENCE_THRESHOLD:
+        confidence = "low_purity"
+    else:
+        confidence = "high"
+
+    return purity, source, confidence
+
+
 def is_paired_run(run):
     return runs_dict[run]["normal"] is not None
 

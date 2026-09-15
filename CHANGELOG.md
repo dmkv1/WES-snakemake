@@ -7,6 +7,46 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
+## [2.3.0] - 2026-09-15
+
+**This release changes CNV calls and CCF for every sample whose PureCN fit was
+flagged but still numeric, and changes the per-sample `purity.csv` sidecar and
+`results/combined/combined_qc.tsv` schema.** `resolve_purity_source` (see
+purecn.smk) no longer rejects a PureCN purity estimate for carrying a flag
+other than `POOR GOF` (`LOW PURITY`, `NON-ABERRANT`, `NOISY SEGMENTATION`,
+`EXCESSIVE LOH`, `EXCESSIVE LOSSES`, ...). Before this release, any such flag
+forced `purity=1` (`source=assumed_pure`) regardless of the actual PureCN
+number — purity 1 is CNVkit's unrescaled default, which systematically dilutes
+real copy-number signal toward "no event" and, downstream, deflates CCF
+(`combine_results.R` divides by this same purity). A flagged-but-numeric
+PureCN estimate is used as-is now; only a sample with no numeric estimate at
+all (PureCN did not run, failed, or reported no purity) still falls back to
+`assumed_pure`.
+
+A new `purity_confidence` column (`high` / `low_purity` / `unknown`) is added
+to the purity sidecar and threads through to `combined_qc.tsv`, so downstream
+analysis can flag low- or unknown-confidence samples for cautious
+interpretation instead of silently blending them in: `unknown` for
+`assumed_pure` (no real measurement), `low_purity` for any resolved purity
+below 0.30 (PureCN's own low-purity threshold), `high` otherwise.
+
+Re-run `resolve_purity_source`, `cnvkit_call` and `combine_results` for every
+paired-tumor sample and re-derive `results/combined/*` before comparing
+against a pre-2.3.0 cohort. No `config.yaml` or samplesheet changes are
+required for existing setups — `purity_confidence` is an additive column.
+
+**Documents the CNVkit patch this pipeline already needs.** The stock
+`etal/cnvkit:0.9.14` container (`containers.cnvkit`) collapses distinct
+CBS/none re-segmentation segments onto one shared start/end whenever a
+`pandas.concat` in `cnvlib.segmentation` produces duplicate index labels
+(upstream issue #1125, fixed on master by PR #1131, not yet in a tagged
+release). `containers/cnvkit/` adds the Dockerfile and patch script to build a
+fixed image from source, so the fix has a pipeline-tracked home instead of
+living only as an ad hoc image built in a downstream analysis project.
+`config.yaml.example` now flags the stock image as broken and points at it.
+No pipeline code changed here — repoint `containers.cnvkit` at a built patched
+image before running.
+
 ## [2.1.0] - 2026-08-26
 
 **This release changes `results/combined/combined_svs.tsv` and the per-sample
