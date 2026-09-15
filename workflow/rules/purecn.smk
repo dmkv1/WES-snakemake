@@ -104,13 +104,20 @@ rule resolve_purity_source:
     Purity, in priority order:
       1. 'known'        — samplesheet tumor_fraction (orthogonal ground truth:
                           sorting/cytometry, PDX=1). Overrides PureCN.
-      2. 'purecn'       — PureCN's estimate, IF it ran, did not Fail, and its
-                          ONLY flag (if any) is POOR GOF. No numeric GOF cutoff;
-                          any other flag (NON-ABERRANT, LOW PURITY, NOISY
-                          SEGMENTATION, EXCESSIVE LOH, contamination...) rejects.
+      2. 'purecn'       — PureCN's estimate, IF it ran, did not Fail, and
+                          produced a numeric Purity. Flag content (LOW PURITY,
+                          NON-ABERRANT, POOR GOF, NOISY SEGMENTATION,
+                          EXCESSIVE LOH, ...) no longer rejects the estimate:
+                          a flagged fit is still the best purity we have, and
+                          forcing purity 1 instead only throws away signal —
+                          see purity_confidence below for the QC signal that
+                          replaces the old reject. Before 2.3.0 any flag other
+                          than POOR GOF rejected the estimate outright, which
+                          silently zeroed real CNAs in ~1 in 4 samples cohort-
+                          wide (WES-MCL-II notebook, 2026-09-09).
       3. 'assumed_pure' — no known value and no usable PureCN estimate: purity 1
                           (cnvkit calls unrescaled, as in the pre-PureCN default;
-                          e.g. tumor-only samples).
+                          e.g. tumor-only samples, or PureCN failed/didn't run).
 
     Ploidy (tracked separately as ploidy_source, resolved independently of the
     purity source above — see the 2026-08-24 notebook entries for why a
@@ -158,20 +165,6 @@ rule resolve_purity_source:
             purecn_comment = row.get("Comment", "")
             purecn_failed = str(row.get("Failed", "")).strip().upper() == "TRUE"
 
-        def purecn_usable():
-            # Accept PureCN only if enabled, it ran, didn't fail, has a purity,
-            # and its only flag reason (if flagged) is POOR GOF.
-            if not (params.use_purecn and params.eligible and input.purecn_csv):
-                return False
-            if purecn_failed or purecn_purity in ("", "NA", None):
-                return False
-            if str(purecn_flagged).strip().upper() != "TRUE":
-                return True  # not flagged
-            reasons = [r.strip() for r in str(purecn_comment).split(";") if r.strip()]
-            return bool(reasons) and all(
-                r.upper().startswith("POOR GOF") for r in reasons
-            )
-
         # Integer baseline ploidy for cnvkit --ploidy (which is type=int) and the
         # QC table. PureCN reports only a continuous Ploidy, so round it half-up
         # to the nearest integer (min 1); fall back to diploid when PureCN did
@@ -185,12 +178,10 @@ rule resolve_purity_source:
             return max(1, int(p + 0.5)) if p > 0 else None
 
         known = params.known  # float in (0,1] or None
-        if known is not None:
-            purity, source = str(known), "known"
-        elif purecn_usable():
-            purity, source = purecn_purity, "purecn"
-        else:
-            purity, source = "1", "assumed_pure"
+        purecn_available = bool(params.use_purecn and params.eligible and input.purecn_csv)
+        purity, source, purity_confidence = resolve_purity(
+            known, purecn_purity, purecn_failed, purecn_available
+        )
 
         known_ploidy = params.known_ploidy  # int or None
         purecn_ploidy_int = None if purecn_failed else round_ploidy(purecn_ploidy)
@@ -209,6 +200,7 @@ rule resolve_purity_source:
                     "run",
                     "sample",
                     "purity",
+                    "purity_confidence",
                     "ploidy",
                     "source",
                     "ploidy_source",
@@ -226,6 +218,7 @@ rule resolve_purity_source:
                     "run": wildcards.run,
                     "sample": wildcards.sample,
                     "purity": purity,
+                    "purity_confidence": purity_confidence,
                     "ploidy": ploidy,
                     "source": source,
                     "ploidy_source": ploidy_source,

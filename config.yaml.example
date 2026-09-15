@@ -10,6 +10,10 @@ run_id: ""            # Human-readable label prepended to Telegram notifications
 containers:
   gatk: "docker://broadinstitute/gatk:4.6.2.0"
   vep: "docker://ensemblorg/ensembl-vep:release_116.0"
+  # Stock 0.9.14 corrupts CBS/none segment boundaries under a pandas index
+  # collision (etal/cnvkit issue #1125, fixed upstream but not yet released --
+  # see containers/cnvkit/README.md). Build that patched image and repoint
+  # this at it (a local .sif path, or wherever you push it) before running.
   cnvkit: "docker://etal/cnvkit:0.9.14"
   delly: "docker://dellytools/delly:v2.5.1"
 
@@ -89,10 +93,12 @@ params:
       # Purity/ploidy for cnvkit_call, resolved per tumor by
       # resolve_purity_source (purecn.smk) in priority: (1) samplesheet
       # tumor_fraction when known; (2) PureCN's estimate if it ran, didn't fail,
-      # and its ONLY flag is POOR GOF; (3) else assume pure (purity 1).
-      # use_purecn_purity=false disables step 2 (known-or-assume-pure only), the
-      # rollback path. PureCN still runs regardless, so its numbers stay in the
-      # report for comparison even when unused.
+      # and produced a numeric purity (flag content no longer rejects it — see
+      # purity_confidence in combined_qc.tsv for the QC signal instead);
+      # (3) else assume pure (purity 1). use_purecn_purity=false disables step
+      # 2 (known-or-assume-pure only), the rollback path. PureCN still runs
+      # regardless, so its numbers stay in the report for comparison even when
+      # unused.
       use_purecn_purity: true
     fastp:
       # adds sequence-based PE adapter detection as a backstop to R1/R2 overlap analysis
