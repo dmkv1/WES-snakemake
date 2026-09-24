@@ -9,6 +9,8 @@ changes results needs a re-run before you compare old and new cohorts.
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-09-24
+
 **This release changes the SNV annotation (SYMBOL, Consequence, HGVSp and the other
 transcript fields) of variants that overlap more than one gene.** `vep` now passes
 `--pick_order mane_select,mane_plus_clinical,canonical,rank,appris,tsl,biotype,ccds,length`.
@@ -469,6 +471,10 @@ Mutect2 SNV calling, CNVkit copy number calling, Manta SV calling, Funcotator
 annotation, xengsort host read filtering for PDX samples, and an Excel report per tumor
 sample.
 
+[2.3.2]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.1...v2.3.2
+[2.3.1]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.0...v2.3.1
+[2.3.0]: https://github.com/dmkv1/WES-snakemake/compare/v2.1.0...v2.3.0
+[2.1.0]: https://github.com/dmkv1/WES-snakemake/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/dmkv1/WES-snakemake/compare/v1.1.0...v1.2.0
