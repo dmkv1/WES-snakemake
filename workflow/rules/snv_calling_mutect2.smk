@@ -310,5 +310,6 @@ rule vep:
         --fasta {input.refg} \
         --everything \
         --pick \
+        --pick_order mane_select,mane_plus_clinical,canonical,rank,appris,tsl,biotype,ccds,length \
         > {log} 2>&1
         """

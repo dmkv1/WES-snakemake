@@ -345,7 +345,10 @@ rows are per unit. Every metric from the finished BAM has one row per sample.
 * **Population AF filter** (tumor-only only) removes the variants with a gnomAD AF above
   `tumor_only.af_threshold`.
 * **VEP** annotates the variants offline from the local cache, with `--everything` and
-  `--pick`. The container is `ensemblorg/ensembl-vep:release_116.0`.
+  `--pick`. The pick order is `mane_select,mane_plus_clinical,canonical,rank,...`: a
+  MANE/canonical transcript always wins over other isoforms, and consequence severity
+  decides between the MANE transcripts of overlapping genes (a MYD88 missense wins over
+  an ACAA1 upstream hit). The container is `ensemblorg/ensembl-vep:release_116.0`.
 
 ### 6. Copy number variant calling
 
