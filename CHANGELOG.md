@@ -7,6 +7,18 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
+## [Unreleased]
+
+**This release changes the SNV annotation (SYMBOL, Consequence, HGVSp and the other
+transcript fields) of variants that overlap more than one gene.** `vep` now passes
+`--pick_order mane_select,mane_plus_clinical,canonical,rank,appris,tsl,biotype,ccds,length`.
+VEP's default order ranks consequence severity after appris, tsl, biotype and ccds, so
+when two genes' MANE transcripts overlap a variant, the pick could land on a flanking or
+intronic consequence of the neighbouring gene: MYD88 L265P (chr3:38141150) was reported
+as an ACAA1 `upstream_gene_variant`. Severity now decides between MANE/canonical
+transcripts; non-MANE isoforms still never win over MANE. Re-run `vep` and everything
+downstream of it (`combine_results`) before comparing against an earlier cohort.
+
 ## [2.3.1] - 2026-09-15
 
 **This release changes CCF for every SNV that falls in a copy-number-altered
