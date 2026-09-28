@@ -14,6 +14,9 @@ rule fastp_trim:
             if config["params"]["fastp"]["detect_adapter_for_pe"]
             else ""
         ),
+        trim_front=lambda wildcards: config["probe_configs"][
+            probe_dict[wildcards.run][wildcards.sample]
+        ].get("trim_front", 0),
     benchmark:
         "work/benchmarks/fastp_trim/{run}_{sample}.{unit}.tsv",
     conda:
@@ -25,6 +28,7 @@ rule fastp_trim:
         "-o {output.fq1} -O {output.fq2} "
         "-h {output.html} -j {output.json} "
         "{params.detect_adapter} "
+        "--trim_front1 {params.trim_front} --trim_front2 {params.trim_front} "
         "-w {threads} > {log} 2>&1"
 
 

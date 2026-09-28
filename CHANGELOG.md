@@ -9,6 +9,29 @@ changes results needs a re-run before you compare old and new cohorts.
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-09-28
+
+**With default settings this release does not change results.** Four new options change
+results when set, and `config.yaml.example` sets two of them (`trim_front: 5` for
+V8+UTR, `params.mutect2.interval_padding: 150`). A config copied from the example
+changes V8+UTR reads, the Mutect2 calling territory and everything downstream.
+
+### Added
+- `probe_configs.<kit>.trim_front` (default 0): fastp `--trim_front1/--trim_front2`.
+  SureSelect XT HS2 libraries (V8+UTR) start each read with a 3-bp molecular barcode and
+  1-2 dark bases. Untrimmed, bwa soft-clips them in ~95% of reads.
+- `params.mutect2.interval_padding` (default 0): Mutect2 `--interval-padding` around
+  the covered-BED intervals.
+- `keep_strand_bias_calls` (default false): the final VCF also keeps records whose only
+  FilterMutectCalls label is `strand_bias`.
+- `tumor_only.keep_germline_calls` (default false) and
+  `tumor_only.germline_rescue_max_gnomad_af` (1e-5): in tumor-only runs the final VCF also
+  keeps records whose only label is `germline` and whose POPAF gives a gnomAD AF at or
+  below the cutoff.
+- `combined_snvs.tsv`: columns `SB_REF_FWD_tumor`, `SB_REF_REV_tumor`,
+  `SB_ALT_FWD_tumor`, `SB_ALT_REV_tumor` (tumor strand counts, VCF `SB`). `FILTER` holds
+  `strand_bias` or `germline` for the records that the two options keep.
+
 ## [2.3.2] - 2026-09-24
 
 **This release changes the SNV annotation (SYMBOL, Consequence, HGVSp and the other
@@ -471,6 +494,7 @@ Mutect2 SNV calling, CNVkit copy number calling, Manta SV calling, Funcotator
 annotation, xengsort host read filtering for PDX samples, and an Excel report per tumor
 sample.
 
+[2.4.0]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.2...v2.4.0
 [2.3.2]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.0...v2.3.1
 [2.3.0]: https://github.com/dmkv1/WES-snakemake/compare/v2.1.0...v2.3.0

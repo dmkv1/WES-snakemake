@@ -70,7 +70,7 @@ purity <- purity_info$purity[1]
 
 # --- Parse Mutect2 vcf ----
 vcf <- suppressWarnings(VariantAnnotation::readVcf(input_file_vcf, "hg38"))
-vcf <- vcf[rowRanges(vcf)$FILTER == "PASS"]
+vcf <- vcf[rowRanges(vcf)$FILTER %in% c("PASS", "strand_bias", "germline")]
 
 allowed_chrs <- c(paste0("chr", (1:22)), "chrX", "chrY", "chrM", "chrMT")
 vcf <- vcf[word(names(vcf), 1, sep = ":") %in% allowed_chrs, ]
@@ -81,6 +81,8 @@ if (length(vcf) == 0) {
     Position = character(), Variant = character(), FILTER = character(),
     AF_tumor = numeric(), GT_tumor = character(),
     DP_tumor = integer(), AD_REF_tumor = integer(), AD_ALT_tumor = integer(),
+    SB_REF_FWD_tumor = integer(), SB_REF_REV_tumor = integer(),
+    SB_ALT_FWD_tumor = integer(), SB_ALT_REV_tumor = integer(),
     normal_cn = integer(), tumor_cn = integer(),
     tumor_cn1 = integer(), tumor_cn2 = integer(),
     expected_mutant_copies = integer(), CCF = numeric()
@@ -132,9 +134,23 @@ if (length(vcf) == 0) {
     mutate(across(everything(), ~ sapply(., function(x) x[2]))) %>%
     setNames(paste0("AD_ALT_", geno_roles))
 
+  # Strand-specific read counts (ref fwd, ref rev, alt fwd, alt rev) of the tumor sample,
+  # input of the Fisher strand-bias test in WES-filtering
+  sb_tumor_idx <- if (n_geno_samples == 2) 3 - ctrl_idx else 1
+  sb_geno <- geno(vcf)[["SB"]]
+  sb_mat <- if (length(dim(sb_geno)) == 3) {
+    matrix(as.integer(sb_geno[, sb_tumor_idx, ]), ncol = 4)
+  } else {
+    do.call(rbind, lapply(sb_geno[, sb_tumor_idx], function(x) {
+      if (length(x) == 4) as.integer(x) else rep(NA_integer_, 4)
+    }))
+  }
+  sb.df <- as.data.frame(sb_mat) %>%
+    setNames(c("SB_REF_FWD_tumor", "SB_REF_REV_tumor", "SB_ALT_FWD_tumor", "SB_ALT_REV_tumor"))
+
   csq <- extractCSQ(vcf)
 
-  result <- cbind(filter.df, gt.df, ad_ref.df, ad_alt.df, af.df, dp.df, csq) %>%
+  result <- cbind(filter.df, gt.df, ad_ref.df, ad_alt.df, af.df, dp.df, sb.df, csq) %>%
     rownames_to_column("Variant") %>%
     mutate(Position = word(Variant, 1, sep = "_"),
            .before = "Variant") %>%
