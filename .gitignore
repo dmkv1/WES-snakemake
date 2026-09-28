@@ -52,3 +52,8 @@ results*/
 coverage.xml
 htmlcov/
 .pytest_cache/
+# Profiles: only the default profile config is tracked
+profiles/*
+!profiles/default/
+profiles/default/*
+!profiles/default/config.yaml
