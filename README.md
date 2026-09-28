@@ -101,11 +101,13 @@ host.
 |---|---|
 | `samplesheet` | Path to the samplesheet CSV, relative to the repository root |
 | `containers` | Pinned image tags for GATK, VEP, CNVkit and DELLY |
-| `probe_configs.<kit>` | Per capture kit: `covered_bedfile`, `target_regions_bedfile`, `cnvkit_targets`, `cnvkit_antitargets` |
+| `probe_configs.<kit>` | Per capture kit: `covered_bedfile`, `target_regions_bedfile`, `cnvkit_targets`, `cnvkit_antitargets`, optional `trim_front` (bases fastp trims from the 5' end of R1 and R2, default 0) |
 | `refs` | The reference data paths from the table above, plus `refs.path` |
-| `params` | Tool settings: `rg.strict`, `xengsort`, `cnvkit.filter_ci`, `cnv.use_purecn_purity`, `fastp`, `bqsr`, `delly`, `somalier` |
+| `params` | Tool settings: `rg.strict`, `xengsort`, `cnvkit.filter_ci`, `cnv.use_purecn_purity`, `fastp`, `bqsr`, `mutect2.interval_padding` (default 0), `delly`, `somalier` |
 | `panel_of_normals` | The panel paths from the table above, plus `panel_of_normals.path` |
+| `keep_strand_bias_calls` | Keep records whose only FilterMutectCalls label is `strand_bias` in the final VCF. Default false |
 | `tumor_only.af_threshold` | The gnomAD allele frequency cutoff for tumor-only runs. Default 0.001 |
+| `tumor_only.keep_germline_calls` | Keep records whose only FilterMutectCalls label is `germline`, with a gnomAD AF of at most `tumor_only.germline_rescue_max_gnomad_af`, in the final VCF of tumor-only runs. Default false |
 | `resources` | Threads, Java heap limits and memory for the scheduler |
 
 **Bind roots.** The Snakefile sets `APPTAINER_BIND` and `SINGULARITY_BIND` from exactly
@@ -286,8 +288,9 @@ snakemake --rulegraph --profile profiles/default | dot -Tpng -o rulegraph.png
 
 ### 1. Quality control and trimming
 
-**fastp** removes adapter sequences and low-quality bases. It runs once per unit. The
-HTML and JSON reports go to the MultiQC report.
+**fastp** removes adapter sequences and low-quality bases, and the first
+`probe_configs.<kit>.trim_front` bases of R1 and R2. It runs once per unit. The HTML and
+JSON reports go to the MultiQC report.
 
 ### 2. Host read filter (PDX samples only)
 
@@ -332,7 +335,8 @@ rows are per unit. Every metric from the finished BAM has one row per sample.
 
 ### 5. SNV and indel calling
 
-* **GATK Mutect2** calls somatic variants inside the capture regions.
+* **GATK Mutect2** calls somatic variants inside the capture regions, padded by
+  `params.mutect2.interval_padding`.
   * *Paired mode*: tumor and matched normal BAMs, with the gnomAD germline resource.
   * *Tumor-only mode*: the PON and the gnomAD germline resource, with no normal BAM.
 * **GATK LearnReadOrientationModel** builds the orientation-bias priors from the F1R2
@@ -341,7 +345,13 @@ rows are per unit. Every metric from the finished BAM has one row per sample.
   contamination. In paired mode, the calculation uses the matched normal.
 * **GATK FilterMutectCalls** applies the statistical filter model, with the orientation
   priors and the contamination estimate.
-* **bcftools** keeps the PASS variants and sorts them.
+* **bcftools** keeps the PASS variants and sorts them. With `keep_strand_bias_calls`, it
+  also keeps the records whose only label is `strand_bias`. With
+  `tumor_only.keep_germline_calls` in tumor-only runs, it also keeps the records whose
+  only label is `germline` and whose gnomAD AF (Mutect2 POPAF) is at most
+  `tumor_only.germline_rescue_max_gnomad_af`. The `FILTER` column of the combined SNV
+  table carries these labels, and `SB_{REF,ALT}_{FWD,REV}_tumor` carry the tumor strand
+  counts for a downstream strand-bias test.
 * **Population AF filter** (tumor-only only) removes the variants with a gnomAD AF above
   `tumor_only.af_threshold`.
 * **VEP** annotates the variants offline from the local cache, with `--everything` and

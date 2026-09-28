@@ -1,3 +1,6 @@
+import math
+
+
 def get_normal_sample(wildcards):
     """Get normal sample name for a given run"""
     return runs_dict[wildcards.run]["normal"]
@@ -39,6 +42,7 @@ rule run_mutect2:
             if not is_tumor_only(w) else ""
         ),
         germline=config["refs"]["germline_resource"],
+        interval_padding=config["params"].get("mutect2", {}).get("interval_padding", 0),
         ref_path=config["refs"]["path"],
     threads: config["resources"]["mutect2_threads"]
     resources:
@@ -62,6 +66,7 @@ rule run_mutect2:
         {params.pon_arg} \
         --intervals {input.regions} \
         {params.normal_regions_arg} \
+        --interval-padding {params.interval_padding} \
         {params.normal_args} \
         -I {input.tumor} \
         --f1r2-tar-gz {output.f1r2} \
@@ -227,11 +232,30 @@ rule filter_and_sort_mutect2_calls:
         regions=lambda w: f"work/refs/regions/{get_probe_version(w)}/regions.bed.gz",
     output:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.final.vcf",
+    params:
+        # PASS, plus, when configured: records whose only FilterMutectCalls label is
+        # strand_bias (keep_strand_bias_calls), and, in tumor-only runs, records whose only
+        # label is germline (no panel_of_normals label) with a gnomAD allele frequency of at
+        # most tumor_only.germline_rescue_max_gnomad_af, read from Mutect2's POPAF
+        # (-log10 of the germline-resource AF). WES-filtering decides which of them to keep.
+        include=lambda w: " || ".join(
+            ['FILTER="PASS"']
+            + (['FILTER="strand_bias"'] if config.get("keep_strand_bias_calls", False) else [])
+            + (
+                [
+                    '(FILTER="germline" && INFO/POPAF[0]>={:.6f})'.format(
+                        -math.log10(config["tumor_only"]["germline_rescue_max_gnomad_af"])
+                    )
+                ]
+                if is_tumor_only(w) and config["tumor_only"].get("keep_germline_calls", False)
+                else []
+            )
+        ),
     conda:
         "../envs/bcftools.yaml"
     shell:
         """
-        bcftools view -f PASS {input.vcf} | bcftools sort -Ov -o {output.vcf}
+        bcftools view -i '{params.include}' {input.vcf} | bcftools sort -Ov -o {output.vcf}
         """
 
 

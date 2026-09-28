@@ -24,6 +24,10 @@ containers:
 #                            Matches the WES-PON-smk covered_bedfile.
 #   target_regions_bedfile — the "Regions" BED, used as the HsMetrics TARGET
 #                            interval list (covered_bedfile is the BAIT set).
+#   trim_front             — optional; bases fastp trims from the 5' end of both
+#                            R1 and R2 (default 0). XT HS2 libraries (V8+UTR)
+#                            start each read with a 3-bp molecular barcode and
+#                            1-2 dark bases, so V8+UTR trims 5.
 probe_configs:
   "V6+UTR":
     covered_bedfile:        "/path/to/refs/SureSelectHumanAllExon/V6UTR/S07604624_Covered.bed"
@@ -35,6 +39,7 @@ probe_configs:
     target_regions_bedfile: "/path/to/refs/SureSelectHumanAllExon/V8UTR/S33613271_Regions.bed"
     cnvkit_targets:     "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/targets.bed"
     cnvkit_antitargets: "/path/to/WES-PON-smk/results/PON/cnvkit/SureSelectV8UTR/antitargets.bed"
+    trim_front: 5
 
 refs:
   # Absolute paths to reference directory:
@@ -105,6 +110,9 @@ params:
       detect_adapter_for_pe: true
     bqsr:
       interval_padding: 100
+    mutect2:
+      # Mutect2 --interval-padding (bp) around the covered-BED intervals (default 0)
+      interval_padding: 150
     delly:
       # DELLY short-read recommendations (per the DELLY author): exclude
       # telomeres/centromeres/unplaced contigs and filter input reads stringently.
@@ -164,8 +172,17 @@ panel_of_normals:
       "V6+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_f_hg38.rds"
       "V8+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_f_hg38.rds"
 
+# Keep records whose only FilterMutectCalls label is strand_bias in the final VCF, so
+# WES-filtering can rescue them (snv_filter_params.strandbias_rescue)
+keep_strand_bias_calls: false
+
 tumor_only:
   af_threshold: 0.001  # Filter variants with population AF > this
+  # Keep records whose only FilterMutectCalls label is germline (not in the PON) in the
+  # final VCF when their gnomAD AF is <= germline_rescue_max_gnomad_af; WES-filtering keeps
+  # protein-altering variants of gene-list genes and hotspots (snv_filter_params.germline_rescue)
+  keep_germline_calls: false
+  germline_rescue_max_gnomad_af: 1.0e-5
 
 # Scale every value below with the machine. Also scale cores, resources.mem_mb
 # and resources.io_heavy in profiles/default/config.yaml.
