@@ -61,13 +61,6 @@ normal_name <- snakemake@params[["normal"]]
 purity_info <- read_csv(snakemake@input[["purity_csv"]], show_col_types = FALSE)
 purity <- purity_info$purity[1]
 
-# Fixed paths for debugging
-# input_file_vcf <- "/home/dmitryk/Projects/WES_analysis/WES-snakemake/results/P005/P005_PT/P005_PT.SNV.vcf"
-# input_cns_cnv <- "/home/dmitryk/Projects/WES_analysis/WES-snakemake/work/cnvkit/P005/P005_PT/P005_PT.call.cns"
-# input_tsv_sv <- "/home/dmitryk/Projects/WES_analysis/WES-snakemake/work/manta/P005/P005_PT/P005_PT.SV.annotated.tsv"
-# purity = 1
-# sample_sex = "male"
-
 # --- Parse Mutect2 vcf ----
 vcf <- suppressWarnings(VariantAnnotation::readVcf(input_file_vcf, "hg38"))
 vcf <- vcf[rowRanges(vcf)$FILTER %in% c("PASS", "strand_bias", "germline")]

@@ -9,6 +9,23 @@ changes results needs a re-run before you compare old and new cohorts.
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-09-29
+
+**Does not change results.**
+
+### Changed
+- `profiles/default/config.yaml` is a safe floor: 8 cores, 64 GB, `io_heavy: 2`. A run
+  launched without a profile no longer takes half the machine. Size a real run with
+  a gitignored `profiles/<name>/` and `./launch.sh --workflow-profile <name>`.
+- `launch.sh` passes its arguments straight to snakemake and no longer adds
+  `--profile profiles/default`. Snakemake loads `profiles/default/` as the workflow
+  profile on its own, and that workflow profile overrides a `--profile` key by key, so
+  select a profile with `--workflow-profile`.
+- README: run and profile section rewritten to match.
+
+### Removed
+- Commented-out debug paths in `workflow/scripts/combine_results.R`.
+
 ## [2.4.0] - 2026-09-28
 
 **With default settings this release does not change results.** Four new options change
@@ -494,6 +511,7 @@ Mutect2 SNV calling, CNVkit copy number calling, Manta SV calling, Funcotator
 annotation, xengsort host read filtering for PDX samples, and an Excel report per tumor
 sample.
 
+[2.4.1]: https://github.com/dmkv1/WES-snakemake/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.2...v2.4.0
 [2.3.2]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.0...v2.3.1

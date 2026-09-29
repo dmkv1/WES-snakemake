@@ -240,20 +240,35 @@ Run the commands from the repository root, because `config.yaml`, `profiles/defa
 and `multiqc_config.yaml` are relative paths.
 
 ```bash
-./launch.sh          # full run
-./launch.sh -n       # dry run, any extra arguments pass through to snakemake
-./stop.sh            # stop a running pipeline
+./launch.sh                               # full run, default profile
+./launch.sh -n                            # dry run; all arguments pass through to snakemake
+./launch.sh --workflow-profile <name>     # full run with profiles/<name>/
+./stop.sh                                 # stop a running pipeline
 ```
 
 `launch.sh` runs in the foreground and writes the log to `snakemake.log`. It records the
 Snakemake process ID in `snakemake.pid` and removes that file when the run ends.
 `stop.sh` reads `snakemake.pid` and sends `SIGTERM`.
 
-`profiles/default/config.yaml` holds the run settings: 32 cores, a 240 GB memory limit
-and `io_heavy: 4`, the cap on concurrent whole-BAM rewrites. The defaults take half of a
-64-thread, 504 GB host. Scale the profile and the `resources` block in `config.yaml`
-together, because the two must agree. The profile has
-no retry setting, so a failed job does not run again.
+### Profiles
+
+A workflow profile holds the run settings. `profiles/default/config.yaml` is a safe
+floor: 8 cores, a 64 GB memory limit and `io_heavy: 2`, the cap on concurrent whole-BAM
+rewrites. 64 GB is the smallest limit that still admits the largest single jobs, xengsort
+at 32 GB and MarkDuplicates at 30 GB. The profile has no retry setting, so a failed job
+does not run again.
+
+For a real run, copy `profiles/default/` to `profiles/<name>/`, raise `cores`,
+`resources.mem_mb` and `io_heavy` to your share of the machine, and launch with
+`--workflow-profile <name>`. Keep `use-conda` and `use-singularity` in the copy. Git
+ignores every profile except `default`, so host sizing stays out of the repository.
+`resources.threads` in `config.yaml` sets the per-job thread count of the multithreaded
+rules, and Snakemake lowers it to `cores` when the profile has fewer.
+
+Select the profile with `--workflow-profile`, not `--profile`. Snakemake always loads
+`profiles/default/` as the workflow profile unless another is named, and workflow-profile
+settings override `--profile` settings key by key, so a `--profile` never changes
+`cores` or `resources`.
 
 ### Tests
 
@@ -281,7 +296,7 @@ end-to-end run of the workflow is the only test for those.
 This command regenerates the rule graph:
 
 ```bash
-snakemake --rulegraph --profile profiles/default | dot -Tpng -o rulegraph.png
+snakemake --rulegraph | dot -Tpng -o rulegraph.png
 ```
 
 ![Pipeline rulegraph](rulegraph.png)
