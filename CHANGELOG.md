@@ -7,7 +7,28 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
-## [Unreleased]
+## [2.4.2] - 2026-10-01
+
+**With default settings this release does not change results.** Tumor-only runs with
+`tumor_only.keep_germline_calls` and `keep_strand_bias_calls` keep more records (see Changed).
+
+### Added
+- `keep_filter_labels` (default `[]`): FilterMutectCalls labels a final-VCF record may
+  carry besides PASS. A record is kept when all its labels are in the list, so
+  `[strand_bias, clustered_events, haplotype]` keeps aSHM clusters next to exons
+  (e.g. IGLL5, PIM1) that `params.mutect2.interval_padding` brings into the calling
+  territory: the clustered call is labelled `clustered_events`, the calls phased with
+  it `clustered_events;haplotype`.
+- `filter_and_sort_mutect2_calls` stops on a FilterMutectCalls header label it does not
+  know, so a GATK update cannot add a label that passes unlisted.
+- `combined_snvs.tsv`: column `ECNT` (events in the Mutect2 assembly region).
+
+### Changed
+- `keep_strand_bias_calls` is deprecated and adds `strand_bias` to `keep_filter_labels`.
+- `tumor_only.keep_germline_calls` keeps `germline` records whose other labels lie in
+  `keep_filter_labels`; it kept `germline`-only records before.
+- `combine_results.R` takes every record of the final VCF; it no longer re-filters by a
+  fixed FILTER list.
 
 ## [2.4.1] - 2026-09-29
 
@@ -511,6 +532,7 @@ Mutect2 SNV calling, CNVkit copy number calling, Manta SV calling, Funcotator
 annotation, xengsort host read filtering for PDX samples, and an Excel report per tumor
 sample.
 
+[2.4.2]: https://github.com/dmkv1/WES-snakemake/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/dmkv1/WES-snakemake/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.2...v2.4.0
 [2.3.2]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.1...v2.3.2

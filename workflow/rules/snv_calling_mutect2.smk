@@ -1,5 +1,13 @@
 import math
 
+MUTECT2_KEEP_LABELS = mutect2_keep_labels(config)
+if config.get("keep_strand_bias_calls"):
+    print(
+        "keep_strand_bias_calls is deprecated: list the labels in "
+        f"keep_filter_labels. Kept labels: {MUTECT2_KEEP_LABELS}",
+        file=sys.stderr,
+    )
+
 
 def get_normal_sample(wildcards):
     """Get normal sample name for a given run"""
@@ -233,28 +241,30 @@ rule filter_and_sort_mutect2_calls:
     output:
         vcf="work/mutect2/{run}/{sample}/{sample}.mutect2.final.vcf",
     params:
-        # PASS, plus, when configured: records whose only FilterMutectCalls label is
-        # strand_bias (keep_strand_bias_calls), and, in tumor-only runs, records whose only
-        # label is germline (no panel_of_normals label) with a gnomAD allele frequency of at
-        # most tumor_only.germline_rescue_max_gnomad_af, read from Mutect2's POPAF
-        # (-log10 of the germline-resource AF). WES-filtering decides which of them to keep.
-        include=lambda w: " || ".join(
-            ['FILTER="PASS"']
-            + (['FILTER="strand_bias"'] if config.get("keep_strand_bias_calls", False) else [])
-            + (
-                [
-                    '(FILTER="germline" && INFO/POPAF[0]>={:.6f})'.format(
-                        -math.log10(config["tumor_only"]["germline_rescue_max_gnomad_af"])
-                    )
-                ]
+        # PASS, plus records whose labels all lie in keep_filter_labels, and, in tumor-only
+        # runs with tumor_only.keep_germline_calls, germline-labelled records (no
+        # panel_of_normals label) with a gnomAD AF of at most
+        # tumor_only.germline_rescue_max_gnomad_af, read from Mutect2's POPAF (-log10 of
+        # the germline-resource AF). WES-filtering decides which of them to keep.
+        include=lambda w: mutect2_include_expr(
+            MUTECT2_KEEP_LABELS,
+            (
+                -math.log10(config["tumor_only"]["germline_rescue_max_gnomad_af"])
                 if is_tumor_only(w) and config["tumor_only"].get("keep_germline_calls", False)
-                else []
-            )
+                else None
+            ),
         ),
+        known=" ".join(["PASS", *MUTECT2_FILTER_LABELS]),
     conda:
         "../envs/bcftools.yaml"
     shell:
         """
+        unknown=$(bcftools view -h {input.vcf} | grep '^##FILTER=<ID=' | cut -d, -f1 | cut -d= -f3 \
+            | grep -vxF $(printf -- '-e %s ' {params.known}) || true)
+        if [ -n "$unknown" ]; then
+            echo "Unknown FilterMutectCalls labels in {input.vcf}: $unknown" >&2
+            exit 1
+        fi
         bcftools view -i '{params.include}' {input.vcf} | bcftools sort -Ov -o {output.vcf}
         """
 
