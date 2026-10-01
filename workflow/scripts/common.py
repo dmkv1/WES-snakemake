@@ -151,3 +151,41 @@ def get_pon_path(wildcards):
     """Get PON VCF path for tumor-only samples"""
     probe = probe_dict[wildcards.run][wildcards.sample]
     return config["panel_of_normals"]["mutect2"][probe]
+
+
+# Labels FilterMutectCalls declares in its VCF header, PASS aside.
+# filter_and_sort_mutect2_calls stops on a header label outside this tuple.
+MUTECT2_FILTER_LABELS = (
+    "FAIL", "base_qual", "clustered_events", "contamination", "duplicate", "fragment",
+    "germline", "haplotype", "low_allele_frac", "map_qual", "multiallelic", "n_ratio",
+    "normal_artifact", "orientation", "panel_of_normals", "position", "possible_numt",
+    "slippage", "strand_bias", "strict_strand", "weak_evidence",
+)
+
+
+def mutect2_keep_labels(cfg):
+    """FilterMutectCalls labels a final-VCF record may carry: keep_filter_labels plus the
+    deprecated switch keep_strand_bias_calls."""
+    labels = list(cfg.get("keep_filter_labels") or [])
+    if cfg.get("keep_strand_bias_calls", False):
+        labels.append("strand_bias")
+    unknown = sorted(set(labels) - set(MUTECT2_FILTER_LABELS))
+    if unknown:
+        raise ValueError(f"keep_filter_labels: unknown FilterMutectCalls labels {unknown}")
+    if "germline" in labels:
+        raise ValueError(
+            "keep_filter_labels: germline is kept through tumor_only.keep_germline_calls, "
+            "which bounds the gnomAD AF"
+        )
+    return sorted(set(labels))
+
+
+def mutect2_include_expr(keep_labels, germline_min_popaf=None):
+    """bcftools -i expression keeping PASS records and records whose labels all lie in
+    keep_labels. With germline_min_popaf (-log10 gnomAD AF), records labelled germline
+    are also kept when their other labels lie in keep_labels and INFO/POPAF reaches it."""
+    allowed = set(keep_labels) | ({"germline"} if germline_min_popaf is not None else set())
+    terms = [f'FILTER!~"{label}"' for label in MUTECT2_FILTER_LABELS if label not in allowed]
+    if germline_min_popaf is not None:
+        terms.append(f'(FILTER!~"germline" || INFO/POPAF[0]>={germline_min_popaf:.6f})')
+    return " && ".join(terms)

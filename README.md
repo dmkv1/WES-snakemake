@@ -105,9 +105,9 @@ host.
 | `refs` | The reference data paths from the table above, plus `refs.path` |
 | `params` | Tool settings: `rg.strict`, `xengsort`, `cnvkit.filter_ci`, `cnv.use_purecn_purity`, `fastp`, `bqsr`, `mutect2.interval_padding` (default 0), `delly`, `somalier` |
 | `panel_of_normals` | The panel paths from the table above, plus `panel_of_normals.path` |
-| `keep_strand_bias_calls` | Keep records whose only FilterMutectCalls label is `strand_bias` in the final VCF. Default false |
+| `keep_filter_labels` | FilterMutectCalls labels a final-VCF record may carry besides PASS, e.g. `[strand_bias, clustered_events, haplotype]`. A record is kept when all its labels are in the list. `germline` is not accepted here. Default `[]`. The deprecated `keep_strand_bias_calls` adds `strand_bias` |
 | `tumor_only.af_threshold` | The gnomAD allele frequency cutoff for tumor-only runs. Default 0.001 |
-| `tumor_only.keep_germline_calls` | Keep records whose only FilterMutectCalls label is `germline`, with a gnomAD AF of at most `tumor_only.germline_rescue_max_gnomad_af`, in the final VCF of tumor-only runs. Default false |
+| `tumor_only.keep_germline_calls` | Keep records labelled `germline` (other labels in `keep_filter_labels`), with a gnomAD AF of at most `tumor_only.germline_rescue_max_gnomad_af`, in the final VCF of tumor-only runs. Default false |
 | `resources` | Threads, Java heap limits and memory for the scheduler |
 
 **Bind roots.** The Snakefile sets `APPTAINER_BIND` and `SINGULARITY_BIND` from exactly
@@ -360,13 +360,14 @@ rows are per unit. Every metric from the finished BAM has one row per sample.
   contamination. In paired mode, the calculation uses the matched normal.
 * **GATK FilterMutectCalls** applies the statistical filter model, with the orientation
   priors and the contamination estimate.
-* **bcftools** keeps the PASS variants and sorts them. With `keep_strand_bias_calls`, it
-  also keeps the records whose only label is `strand_bias`. With
-  `tumor_only.keep_germline_calls` in tumor-only runs, it also keeps the records whose
-  only label is `germline` and whose gnomAD AF (Mutect2 POPAF) is at most
-  `tumor_only.germline_rescue_max_gnomad_af`. The `FILTER` column of the combined SNV
-  table carries these labels, and `SB_{REF,ALT}_{FWD,REV}_tumor` carry the tumor strand
-  counts for a downstream strand-bias test.
+* **bcftools** keeps the PASS variants and the records whose FilterMutectCalls labels
+  all lie in `keep_filter_labels`, and sorts them. With `tumor_only.keep_germline_calls`
+  in tumor-only runs, `germline` counts as a kept label for records whose gnomAD AF
+  (Mutect2 POPAF) is at most `tumor_only.germline_rescue_max_gnomad_af`. The step stops
+  on a FilterMutectCalls label it does not know. The `FILTER` column of the combined SNV
+  table carries the labels, `SB_{REF,ALT}_{FWD,REV}_tumor` carry the tumor strand counts
+  for a downstream strand-bias test, and `ECNT` the number of events in the Mutect2
+  assembly region.
 * **Population AF filter** (tumor-only only) removes the variants with a gnomAD AF above
   `tumor_only.af_threshold`.
 * **VEP** annotates the variants offline from the local cache, with `--everything` and

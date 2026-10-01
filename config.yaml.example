@@ -172,13 +172,17 @@ panel_of_normals:
       "V6+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV6UTR/mapping_bias_SureSelectV6UTR_f_hg38.rds"
       "V8+UTR": "/path/to/WES-PON-smk/results/PON/purecn/SureSelectV8UTR/mapping_bias_SureSelectV8UTR_f_hg38.rds"
 
-# Keep records whose only FilterMutectCalls label is strand_bias in the final VCF, so
-# WES-filtering can rescue them (snv_filter_params.strandbias_rescue)
-keep_strand_bias_calls: false
+# FilterMutectCalls labels a final-VCF record may carry besides PASS; a record is kept when
+# all its labels are listed. WES-filtering decides which of them pass
+# (snv_filter_params.strandbias_rescue, ...). With interval padding, aSHM next to an exon
+# (e.g. IGLL5, PIM1) is labelled clustered_events, and calls phased with it haplotype.
+# germline is set under tumor_only.
+keep_filter_labels: []
+# keep_filter_labels: [strand_bias, clustered_events, haplotype]
 
 tumor_only:
   af_threshold: 0.001  # Filter variants with population AF > this
-  # Keep records whose only FilterMutectCalls label is germline (not in the PON) in the
+  # Keep records labelled germline (not in the PON; other labels in keep_filter_labels) in the
   # final VCF when their gnomAD AF is <= germline_rescue_max_gnomad_af; WES-filtering keeps
   # protein-altering variants of gene-list genes and hotspots (snv_filter_params.germline_rescue)
   keep_germline_calls: false
