@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Group-writable outputs, so any group member can rerun jobs over them.
+umask 002
+
 # Run settings (cores, memory, conda, singularity, etc.) live in a workflow
 # profile under profiles/. Without one, Snakemake uses profiles/default, the
 # safe floor. Select another with --workflow-profile; a --profile would be

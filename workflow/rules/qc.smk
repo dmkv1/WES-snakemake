@@ -159,5 +159,16 @@ rule multiqc:
     conda:
         "../envs/qc.yaml"
     shell:
-        "multiqc -c {input.config} -c {input.renames} results/ work/logs/ "
-        "-o results/qc/ --force > {log} 2>&1"
+        """
+        # Removed first so the current user owns all of multiqc_data/ and can
+        # fix its group below
+        rm -rf results/qc/multiqc_data
+
+        multiqc -c {input.config} -c {input.renames} results/ work/logs/ \
+        -o results/qc/ --force > {log} 2>&1
+
+        # MultiQC moves multiqc_data/ in from a temp dir, so it keeps neither
+        # the setgid bit nor the group of results/qc/
+        chgrp -R --reference=results/qc results/qc/multiqc_data
+        chmod g+s results/qc/multiqc_data
+        """
