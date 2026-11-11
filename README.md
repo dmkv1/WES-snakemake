@@ -1,6 +1,6 @@
 # WES-snakemake: Somatic Variant Calling Pipeline
 
-[![version](https://img.shields.io/github/v/tag/dmkv1/WES-snakemake?label=version&sort=semver)](https://github.com/dmkv1/WES-snakemake/blob/development/CHANGELOG.md)
+[![version](https://img.shields.io/github/v/tag/dmkv1/WES-snakemake?label=version&sort=semver)](https://github.com/dmkv1/WES-snakemake/blob/main/CHANGELOG.md)
 [![tests](https://github.com/dmkv1/WES-snakemake/actions/workflows/tests.yml/badge.svg)](https://github.com/dmkv1/WES-snakemake/actions/workflows/tests.yml)
 ![coverage](.github/badges/coverage.svg)
 
@@ -11,21 +11,28 @@ It also supports Patient-Derived Xenograft (PDX) samples.
 
 ## Requirements
 
-The pipeline needs two toolchains, because `profiles/default/config.yaml` sets both
-`use-conda` and `use-singularity`:
+Install two things on the host:
 
-* A conda solver: conda, mamba or micromamba.
-* Apptainer or Singularity.
+* **mamba**, or conda or micromamba. It creates the `snakemake` driver environment and is not used after that.
+* **Apptainer** or Singularity.
 
-Create the driver environment from `environment.yml`. For micromamba:
+Create the driver environment from `environment.yml`:
 
 ```bash
-micromamba env create -f environment.yml
-micromamba activate snakemake
+mamba env create -f environment.yml
+mamba activate snakemake
 ```
 
-Snakemake builds all other environments per rule, and pulls the container images on the
-first run.
+The pipeline installs everything else on the first run, which needs internet access:
+
+* **Conda environments**, one per tool, from `workflow/envs/`. Snakemake builds them
+  with the `conda` inside the `snakemake` environment, not with your mamba, and keeps
+  them in `.snakemake/conda/`.
+* **Container images** for GATK, CNVkit, DELLY and VEP, set under `containers` in
+  `config.yaml`. Snakemake pulls them into `.snakemake/singularity/`.
+
+Both are built once and reused. To build the environments ahead of the first run, use
+`./launch.sh --conda-create-envs-only`.
 
 ## Reference data
 
@@ -87,8 +94,7 @@ Mutect2 PON entry.
 
 ## Configuration
 
-`config.yaml` holds the run settings. The repository tracks `config.yaml.example` and
-ignores `config.yaml`, so your host paths stay out of git. Copy the example first:
+`config.yaml` holds the run settings. The repository tracks `config.yaml.example` and ignores `config.yaml`, so your host paths stay out of git. Copy the example first:
 
 ```bash
 cp config.yaml.example config.yaml
@@ -127,23 +133,30 @@ notifications.
 
 ## Samplesheet
 
-Create a comma-separated table with these columns:
+Create a comma-separated table with these columns. The required columns are `ID`, `sample`,
+`fq1` and `fq2`. The others can be left out or blank, with the effects described below.
+No cell or header may contain whitespace.
 
 * **ID**: Sample group identifier, usually a patient ID. Samples that share an ID are
   processed together. The value must not contain `_`, `.` or `/`, because output files
   use the `{ID}_{sample}` pattern.
-* **sample**: Sample identifier, unique in the given ID.
-* **sample_type**: `CTRL` for the matched normal, `PDX` for a xenograft. Any other value
-  is a tumor sample.
+* **sample**: Sample identifier, unique in the given ID. The value must not contain `.`
+  or `/`.
+* **sample_type**: `CTRL` for the matched normal, `PDX` for a xenograft. Any other value,
+  blank included, is a tumor sample.
 * **gender**: `f` for female, `m` for male. It selects the sex-matched CNVkit and PureCN
-  panel files.
-* **capture_kit**: The exome kit version. It must be a key in `probe_configs`.
+  panel files. Blank selects the female files.
+* **capture_kit**: The exome kit version. It must be a key in `probe_configs`. A tumor
+  in a tumor-only run needs it, because it selects the Panel of Normals.
 * **tumor_fraction**: The known tumor cell fraction, in `(0,1]`. Blank or `NA` means
   unknown, and the purity then comes from PureCN. `0` is not valid.
+* **known_ploidy**: The known tumor ploidy as a positive integer, for example from a
+  karyotype or a flow cytometry DNA index. Blank or `NA` means unknown, and the ploidy
+  then comes from PureCN, or defaults to 2.
 * **fq1**: Path to the R1 FASTQ, or a glob that matches several. See below.
 * **fq2**: Path to the R2 FASTQ, which must match `fq1`.
 
-Example:
+Example, without the optional `known_ploidy` column:
 
 | ID   | sample   | sample_type | gender | capture_kit | tumor_fraction | fq1 | fq2 |
 |------|----------|-------------|--------|-------------|----------------|-----|-----|
@@ -154,8 +167,8 @@ Example:
 
 ### Multi-lane samples and read groups
 
-The pipeline aligns a sample once per lane. Each alignment gets its own read group.
-`MarkDuplicates` then gathers the per-lane BAMs. There are two ways to write this:
+The pipeline aligns a sample once per unit, one FASTQ pair, usually one lane. Each
+alignment gets its own read group. `MarkDuplicates` then gathers the per-unit BAMs. There are two ways to write this:
 
 * **One row with globbed paths**, for example
   `fq1: /path/SAMPLE_S3_L*_R1_001.fastq.gz`. The glob expands to one *unit* per matched
@@ -212,7 +225,8 @@ The pipeline uses tumor-only mode for a group that has no `CTRL` sample. In this
 * A population allele frequency filter runs after the PASS filter. It removes variants
   with a gnomAD AF above `tumor_only.af_threshold`.
 * CNVkit runs without B-allele frequency data, and HaplotypeCaller does not run.
-* PureCN does not run, so the purity comes from the samplesheet or defaults to 1.
+* PureCN does not run, so the purity comes from the samplesheet `tumor_fraction` or
+  defaults to 1, and the ploidy comes from `known_ploidy` or defaults to 2.
 * Manta runs in tumor-only mode.
 * DELLY calls the tumor alone and applies no somatic filter, because that filter needs a
   matched normal.
@@ -276,9 +290,10 @@ settings override `--profile` settings key by key, so a `--profile` never change
 pytest
 ```
 
-The suite covers the samplesheet parser and the read-group logic. It is pure Python, so
-it runs in seconds and needs no container. Run it after you edit a samplesheet, because
-it catches a bad row before a long run starts.
+The suite covers the samplesheet parser, the read-group logic and the purity and
+filter helpers. It is pure Python on synthetic fixtures, so it runs in seconds and needs
+no container. It does not read your `samplesheet.csv`. To check a samplesheet, run a dry
+run with `./launch.sh -n`, which stops with an error on a bad row.
 
 To see the coverage report:
 
@@ -286,8 +301,7 @@ To see the coverage report:
 pytest --cov=workflow/scripts --cov-report=term-missing
 ```
 
-GitHub Actions runs the same suite on every push to `development` and on every pull
-request. It regenerates the coverage badge from the result. The badge covers the Python
+GitHub Actions runs the same suite on every push to `main` and on every pull request. It regenerates the coverage badge from the result. The badge covers the Python
 helper modules only. It does not measure the R scripts or the Snakemake rules, and an
 end-to-end run of the workflow is the only test for those.
 
@@ -315,7 +329,7 @@ alignment.
 
 ### 3. Alignment and BAM preprocessing
 
-The GATK steps use the `broadinstitute/gatk:4.6.2.0` container.
+The GATK steps use the container set by the `containers.gatk` config key, `broadinstitute/gatk:4.6.2.0` in the shipped config.
 
 * **bwa mem**, once per unit: `bwa mem -Y -K 100000000 -R '@RG...' | samtools fixmate -m`.
   bwa writes the read group inline, so no later rule adds it. The `-K` option fixes the
@@ -374,12 +388,11 @@ rows are per unit. Every metric from the finished BAM has one row per sample.
   `--pick`. The pick order is `mane_select,mane_plus_clinical,canonical,rank,...`: a
   MANE/canonical transcript always wins over other isoforms, and consequence severity
   decides between the MANE transcripts of overlapping genes (a MYD88 missense wins over
-  an ACAA1 upstream hit). The container is `ensemblorg/ensembl-vep:release_116.0`.
+  an ACAA1 upstream hit). The container is set by the `containers.vep` config key, `ensemblorg/ensembl-vep:release_116.0` in the shipped config.
 
 ### 6. Copy number variant calling
 
-**CNVkit** runs in the `etal/cnvkit:0.9.14` container, patched for a segment-boundary
-bug (`containers/cnvkit/README.md`).
+**CNVkit** runs in the container set by the `containers.cnvkit` config key. The shipped config names stock `etal/cnvkit:0.9.14`, which has a segment-boundary bug. Build the patched image described in `containers/cnvkit/README.md` and point `containers.cnvkit` at it before a real run.
 
 * CNVkit calculates the coverage at the target and antitarget regions. It then corrects
   the coverage against the sex-matched panel reference for the capture kit.
@@ -409,7 +422,13 @@ One rule resolves the purity, and it uses this order:
    did not report `Fail`, and it produced a numeric purity. A PureCN flag (`LOW PURITY`,
    `NON-ABERRANT`, `POOR GOF`, ...) does not reject the estimate — it is still the best
    purity available, and forcing purity 1 instead only erases real copy-number signal.
-3. Purity 1 and ploidy 2.
+3. Purity 1.
+
+The ploidy is resolved independently of the purity, in this order:
+
+1. The samplesheet `known_ploidy`, if the value is known.
+2. The PureCN ploidy, if PureCN ran and did not report `Fail`. Flags do not reject it.
+3. Ploidy 2.
 
 The result carries a `purity_confidence` column (`high` / `low_purity` / `unknown`) so
 downstream analysis can facet or footnote by it instead of silently blending a low- or
@@ -552,9 +571,11 @@ changes. Do not compare a cohort across such a release. Run the old data again.
 
 To make a release:
 
-1. Update `CHANGELOG.md` and `VERSION`.
-2. Commit, then tag: `git tag -a v1.0.0 -m "v1.0.0"`.
-3. Push both: `git push origin development --follow-tags`.
+1. Create a branch for the fix or version, for example `fix/<name>`.
+2. Update `CHANGELOG.md` and `VERSION` on that branch, commit, and open a pull request
+   against `main`.
+3. After the merge, tag the merge commit on `main` and push the tag:
+   `git tag -a v1.0.0 -m "v1.0.0" && git push origin v1.0.0`.
 
 The version badge reads the newest tag, so it updates by itself.
 

@@ -309,6 +309,26 @@ def _validate_known_ploidy(samples: pd.DataFrame) -> None:
                 f"NA/blank (got {value!r})")
 
 
+def _reject_whitespace(sheet: pd.DataFrame) -> None:
+    """Refuse any whitespace in the header or a cell.
+
+    Sample IDs and FASTQ paths reach unquoted shell commands and wildcard
+    patterns, where a space splits one argument into two. Trailing spaces from
+    spreadsheet exports are invisible, so every offending cell is named.
+    """
+    bad = [f"header {c!r}" for c in sheet.columns if re.search(r"\s", str(c))]
+    for idx, raw in sheet.iterrows():
+        for column, value in raw.items():
+            if isinstance(value, str) and re.search(r"\s", value):
+                bad.append(f"line {idx + 2} {column}={value!r}")
+    if bad:
+        shown = "; ".join(bad[:10])
+        more = f" (and {len(bad) - 10} more)" if len(bad) > 10 else ""
+        raise SamplesheetError(
+            f"samplesheet contains whitespace, which is not allowed anywhere "
+            f"in it: {shown}{more}")
+
+
 def build_units(sheet: pd.DataFrame, *, resolve_headers: bool = True,
                 strict: bool = False) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """Resolve a samplesheet into (units, samples_meta, warnings).
@@ -320,6 +340,8 @@ def build_units(sheet: pd.DataFrame, *, resolve_headers: bool = True,
     warnings: list[str] = []
     sheet_rows: dict[int, dict] = {}
     resolved: list[dict] = []
+
+    _reject_whitespace(sheet)
 
     for column in ("ID", "sample", "fq1", "fq2"):
         if column not in sheet.columns:

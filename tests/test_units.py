@@ -143,6 +143,29 @@ def test_malformed_lane_column_is_refused(fx, tmp_path):
         _resolve([fx.sheet_row("S1", fq1, fq2, lane="lane-two")])
 
 
+# --- whitespace ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("column,value", [
+    ("sample", "S 1"), ("ID", "P 001"), ("capture_kit", "V6+UTR "),
+    ("fq1", "/data/my run/S1_R1.fastq.gz"),
+])
+def test_whitespace_in_a_cell_is_refused(fx, tmp_path, column, value):
+    fq1, fq2 = fx.pair(tmp_path, "S1")
+    row = fx.sheet_row("S1", fq1, fq2)
+    row[column] = value
+    with pytest.raises(SamplesheetError, match="whitespace"):
+        _resolve([row])
+
+
+def test_whitespace_in_a_header_is_refused(fx, tmp_path):
+    fq1, fq2 = fx.pair(tmp_path, "S1")
+    row = fx.sheet_row("S1", fq1, fq2)
+    row["sample "] = row.pop("sample")
+    with pytest.raises(SamplesheetError, match="header 'sample '"):
+        _resolve([row])
+
+
 # --- barcode ---------------------------------------------------------------
 
 def test_ambiguous_barcode_is_dropped(fx, tmp_path):

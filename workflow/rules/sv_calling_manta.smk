@@ -77,6 +77,9 @@ rule run_manta:
         --callRegions {input.regions_bed} \
         > {log} 2>&1
 
+        # configManta.py sets runWorkflow.py to 0755 regardless of umask
+        chmod g+w {output.workflow}
+
         {output.workflow} \
         --mode local \
         --jobs {threads} --memGb {resources.mem_gb} \

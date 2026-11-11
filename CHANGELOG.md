@@ -7,6 +7,23 @@ paths. See [Versioning](README.md#versioning) in the README.
 Each release states whether it changes results for the same input data. A version that
 changes results needs a re-run before you compare old and new cohorts.
 
+## [2.4.3] - 2026-11-11
+
+**Does not change results.**
+
+### Fixed
+- Group members can resume or rerun each other's runs. Outputs are group-writable and
+  keep the project folder's group, provided the folder is setgid and owned by the lab
+  group (`chgrp -R <group> .` and `find . -type d -exec chmod g+s {} +`).
+  - `launch.sh` sets `umask 002`.
+  - `run_manta`: `runWorkflow.py` is made group-writable; `configManta.py` creates it
+    as 0755.
+  - `multiqc`: `results/qc/multiqc_data/` is removed before MultiQC runs, then given
+    the group of `results/qc/` and the setgid bit, which MultiQC drops when it moves
+    the folder in from a temp dir.
+- The samplesheet parser refuses whitespace in the header or any cell, and names each
+  offending cell. Spaces in IDs or FASTQ paths would otherwise split shell arguments.
+
 ## [2.4.2] - 2026-10-01
 
 **With default settings this release does not change results.** Tumor-only runs with
@@ -532,6 +549,7 @@ Mutect2 SNV calling, CNVkit copy number calling, Manta SV calling, Funcotator
 annotation, xengsort host read filtering for PDX samples, and an Excel report per tumor
 sample.
 
+[2.4.3]: https://github.com/dmkv1/WES-snakemake/compare/v2.4.2...v2.4.3
 [2.4.2]: https://github.com/dmkv1/WES-snakemake/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/dmkv1/WES-snakemake/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/dmkv1/WES-snakemake/compare/v2.3.2...v2.4.0
